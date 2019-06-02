@@ -2,6 +2,7 @@ import numpy as np
 import torch
 from fastai import callbacks
 from fastai.callbacks import SaveModelCallback, partial
+from fastai.metrics import top_k_accuracy, accuracy
 from torch.autograd import Variable
 from torch.nn.functional import log_softmax
 
@@ -91,6 +92,14 @@ def dice_loss(input, target):
     dice = 2 * (num / (den1 + den2))
     dice_eso = dice[:, 1:]  # we ignore bg dice val, and take the fg
 
-    dice_total = -1 * torch.sum(dice_eso) / dice_eso.size(0)  # divide by batch_sz
+    # dice_total = -1 * torch.sum(dice_eso) / dice_eso.size(0)  # divide by batch_sz
+    dice_total = 1 - torch.sum(dice_eso) / dice_eso.size(0)  # divide by batch_sz
 
     return dice_total
+
+
+top2_acc = partial(top_k_accuracy, k=2)
+top3_acc = partial(top_k_accuracy, k=3)
+top2_acc.__name__ = 'top2_accuracy'
+top3_acc.__name__ = 'top3_accuracy'
+tmetrics = [accuracy, top2_acc, top3_acc]
