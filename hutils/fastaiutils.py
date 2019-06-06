@@ -1,8 +1,11 @@
+import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from fastai import callbacks
+from fastai.basic_data import DatasetType
 from fastai.callbacks import SaveModelCallback, partial
 from fastai.metrics import top_k_accuracy, accuracy
+from fastai.train import ClassificationInterpretation
 from torch.autograd import Variable
 from torch.nn.functional import log_softmax
 
@@ -36,6 +39,35 @@ def dificult_weight_loss(y_preds, target, *args, **kwargs):
     xaa = 1 + xa + a
     a = a * xaa
     return torch.mean(a)
+
+
+def prob_loss(target, y):
+    """
+    This is a custom of SoftMaxCrossEntropy
+    Loss when y input as raw probability instead a int number.
+    Use when prob not 1/0 but float distribution
+    :param target: raw_scrore (not softmax)
+    :param y: [0.7 0.2 0.1]
+    :return:
+    """
+    y = y[:, :7]
+    l_softmax = log_softmax(target, 1)
+
+    a = -y * l_softmax
+    a = torch.sum(a, dim=1)
+
+    return torch.mean(a)
+
+
+def prob_acc(target, y):
+    """
+    accuracy when y input as raw probability instead a int number
+    use when prob is not 1/0
+    :param target: raw_score
+    :param y: [0.7 0.2 0.1]
+    :return: accuracy
+    """
+    return accuracy(target, torch.argmax(y, dim=1))
 
 
 def make_one_hot(labels, C=2):
@@ -96,6 +128,32 @@ def dice_loss(input, target):
     dice_total = 1 - torch.sum(dice_eso) / dice_eso.size(0)  # divide by batch_sz
 
     return dice_total
+
+
+def test_image_summary(learn, data_test=None, scale=1.1, is_normalize=True):
+    """
+    Summary result with learn. Use on ipynb.
+    Test data must on "valid" of data_set, else use Valid
+    :param learn:
+    :param data_test:
+    :param scale: image scale, default is 1.1
+    :param is_normalize: if want normalize confusion matrix
+    :return:
+    """
+    if data_test is not None:
+        learn.data = data_test
+    interp = ClassificationInterpretation.from_learner(learn)
+
+    interp.plot_confusion_matrix(figsize=(10, 10), dpi=60, normalize=is_normalize)
+    plt.show()
+
+    preds, y = learn.get_preds(with_loss=False)
+    acc = accuracy(preds, y)
+
+    ys, y = learn.TTA(ds_type=DatasetType.Valid, scale=scale)
+    tta_acc = accuracy(ys, y)
+
+    return acc, tta_acc
 
 
 top2_acc = partial(top_k_accuracy, k=2)
