@@ -39,9 +39,26 @@ def map_str_prob(str_prob):
     return fn
 
 
+def map_str_list_to_type(str_lst, dtype=float):
+    """
+    mostly use when read list present in str format of float
+    :param str_lst: [o1 o2 o3 o4 ...]
+    :param dtype: type to convert, default is float
+    :return:
+    """
+    s = str_lst.replace('[', '').replace(']', '').strip().split()
+    f = [dtype(o) for o in s]
+    return f
+
+
 def test_make_check_point_folder():
     print(make_check_point_folder("/tmp"))
 
 
+def test_map_str_list_to_type():
+    print(map_str_list_to_type("[1 3 4 6]"))
+    print(map_str_list_to_type("[1 3 4 6]", dtype=int))
+
+
 if __name__ == '__main__':
-    test_make_check_point_folder()
+    test_map_str_list_to_type()
