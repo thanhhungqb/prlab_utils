@@ -32,7 +32,7 @@ def map_str_prob(str_prob):
     :param str_prob: '[5, 3, 0, 1, 1]'
     :return: [0.5 0.3 0 .1 .1]
     """
-    s = [o.replace('[', '').replace(']', '').split() for o in str_prob]
+    s = [o.replace('[', '').replace(']', '').replace(',', '').split() for o in str_prob]
     f = [[float(o) for o in row] for row in s]
     f = np.array(f)
     fn = preprocessing.normalize(f, axis=1, norm='l1')
@@ -46,7 +46,7 @@ def map_str_list_to_type(str_lst, dtype=float):
     :param dtype: type to convert, default is float
     :return:
     """
-    s = str_lst.replace('[', '').replace(']', '').strip().split()
+    s = str_lst.replace('[', '').replace(']', '').replace(',', '').strip().split()
     f = [dtype(o) for o in s]
     return f
 
