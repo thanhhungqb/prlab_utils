@@ -5,18 +5,21 @@ import numpy as np
 from sklearn import preprocessing
 
 
-def make_check_point_folder(path, config={}, cp_name=None):
+def make_check_point_folder(config={}, cp_base=None, cp_name=None):
     """
     make a checkpoint folder and csv log
-    :param path:
     :param config:
+    :param cp_base: None for path, but usually in path/models
     :param cp_name:
     :return: path of cp, best cp, csv file path
     """
+    path = config['path']
     path = path if isinstance(path, Path) else Path(path)
     if cp_name is None:
         cp_name = "{}".format(time.strftime("%Y.%m.%d-%H.%M"))
-    cp_path = path / cp_name
+
+    cp_path = path / cp_base if cp_base is not None else path
+    cp_path = cp_path / cp_name
     best_name = cp_path / "best"
     csvLog = cp_path / "loger.csv"
 
