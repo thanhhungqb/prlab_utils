@@ -21,7 +21,7 @@ def make_check_point_folder(config={}, cp_base=None, cp_name=None):
     cp_path = path / cp_base if cp_base is not None else path
     cp_path = cp_path / cp_name
     best_name = cp_path / "best"
-    csvLog = cp_path / "loger.csv"
+    csvLog = cp_path / "loger"
 
     return cp_path, best_name, csvLog
 
