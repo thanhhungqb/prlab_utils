@@ -2,7 +2,11 @@ import time
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 from sklearn import preprocessing
+
+# add ls function to Path for easy to use
+Path.ls = lambda x: list(x.iterdir())
 
 
 def make_check_point_folder(config={}, cp_base=None, cp_name=None):
@@ -21,7 +25,7 @@ def make_check_point_folder(config={}, cp_base=None, cp_name=None):
     cp_path = path / cp_base if cp_base is not None else path
     cp_path = cp_path / cp_name
     best_name = cp_path / "best"
-    csvLog = cp_path / "loger.csv"
+    csvLog = cp_path / "loger"
 
     return cp_path, best_name, csvLog
 
@@ -49,6 +53,42 @@ def map_str_list_to_type(str_lst, dtype=float):
     s = str_lst.replace('[', '').replace(']', '').replace(',', '').strip().split()
     f = [dtype(o) for o in s]
     return f
+
+
+def get_file_rec(path):
+    """
+    Get all file recursive
+    :param path:
+    :return: files
+    """
+    path = path if isinstance(path, Path) else Path(path)
+    if path.is_file():
+        return [path]
+
+    ls = path.ls()
+    files = [o for o in ls if o.is_file()]
+    for cfolder in ls:
+        files.extend(get_file_rec(cfolder))
+
+    return files
+
+
+def load_df_img_data(path, index_keys='filename', bb_key='bb'):
+    """
+    Load DataFrame from csv that has filename as index and bb
+    For easy to track, bb should be in format [center_x center_y width heigh]*n
+    :param path:
+    :param index_keys:
+    :param bb_key:
+    :return:
+    """
+    data = pd.read_csv(path, delimiter=',')
+    data = data.set_index(index_keys)
+
+    float_bb = [map_str_list_to_type(o) for o in data[bb_key]]
+    data[bb_key] = float_bb
+
+    return data
 
 
 def test_make_check_point_folder():
