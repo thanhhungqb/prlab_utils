@@ -12,7 +12,7 @@ word with fastai
 """
 
 
-def next_k_frames_file(fpath, k=5, prefix="frame"):
+def next_k_frames_file(fpath, k=30, prefix="frame"):
     """
     Next k frame file names with form: {prefix}{number}.{suffix}
     :param fpath:
@@ -44,7 +44,7 @@ class VideoFramesItem(ItemBase):
         self.data = torch.stack([img.data for img in self.imgs])
         return self
 
-    def __repr__(self) -> str: return f'{self.__class__.__name__}'
+    def __repr__(self) -> str: return f'{self.__class__.__name__} {self.data.size()}'
 
 
 class VideoFramesList(ImageList):
@@ -57,6 +57,17 @@ class VideoFramesList(ImageList):
         super().__init__(items, **kwargs)
         self.n_frame = n_frame
         self.prefix = prefix
+
+        [self.copy_new.append(o) for o in ['n_frame', 'prefix']]
+
+    def set_n_frame(self, n_frame=5):
+        """
+        Set n_frame
+        :param n_frame:
+        :return:
+        """
+        self.n_frame = n_frame
+        return self
 
     def get(self, i):
         # img0 = super().get(i)
@@ -103,6 +114,31 @@ class CropImageList(ImageList):
         self.max_scale = max_scale
         self.min_scale = min_scale
 
+        [self.copy_new.append(o) for o in ['df', 'scale_type', 'max_scale', 'min_scale']]
+
+    def set_values(self, df=None, scale_type=None, max_scale=None, min_scale=None):
+        """
+        Set values and return self to easy to chain
+        :param df:
+        :param scale_type:
+        :param max_scale:
+        :param min_scale:
+        :return:
+        """
+        if df is not None:
+            self.df = df
+
+        if scale_type is not None:
+            self.scale_type = scale_type
+
+        if max_scale is not None:
+            self.max_scale = max_scale
+
+        if min_scale is not None:
+            self.min_scale = min_scale
+
+        return self
+
     def get(self, i):
         img = super().get(i)
         item = self.items[i]
@@ -111,27 +147,19 @@ class CropImageList(ImageList):
         item_path = item if isinstance(item, Path) else Path(item)
         img_width, img_heigh = img.size
 
-        left, top, right, bottom = self.df.loc[item_path.name, 'bb']
+        # select area to crop from df['bb']
+        center_x, center_y, dx, dy = self.df.loc[item_path.name, 'bb']
 
-        # select area to crop
-        center_x, center_y = (left + right) / 2, (top + bottom) / 2
-        dx, dy = (right - left) / 2, (bottom - top) / 2
+        s_zoom = np.random.uniform(self.min_scale, self.max_scale, 4) \
+            if self.scale_type == 'random' else [self.max_scale] * 4
 
-        if self.scale_type == 'fixed':
-            left, right = center_x - dx * self.max_scale, center_x + dx * self.max_scale
-            top, bottom = center_y - dy * self.max_scale, center_y + dy * self.max_scale
-
-        if self.scale_type == 'random':
-            s_zoom = np.random.uniform(self.min_scale, self.max_scale, 4)
-
-            # TODO random each value in min-max
-            left, right = center_x - dx * s_zoom[0], center_x + dx * s_zoom[1]
-            top, bottom = center_y - dy * s_zoom[2], center_y + dy * s_zoom[3]
+        left, right = center_x - dx / 2 * s_zoom[0], center_x + dx / 2 * s_zoom[1]
+        top, bottom = center_y - dy / 2 * s_zoom[2], center_y + dy / 2 * s_zoom[3]
 
         # refine if out of size
-        left, top, right, bottom = max(1, left), max(1, top), min(img_width - 1, right), min(img_heigh - 1, bottom)
+        # left, top, right, bottom = max(1, left), max(1, top), min(img_width - 1, right), min(img_heigh - 1, bottom)
         size = int(bottom - top), int(right - left)
-        center = (bottom + top) / 2 / img_heigh, (right + left) / 2 / img_width
+        center = (right + left) / 2 / img_width, (bottom + top) / 2 / img_heigh
 
         # cropped = img.crop((left, top, right, bottom))
         cropped = crop_pad(img, size=size, row_pct=center[0], col_pct=center[1])
