@@ -68,7 +68,8 @@ def get_file_rec(path):
     ls = path.ls()
     files = [o for o in ls if o.is_file()]
     for cfolder in ls:
-        files.extend(get_file_rec(cfolder))
+        if cfolder.is_dir():
+            files.extend(get_file_rec(cfolder))
 
     return files
 
