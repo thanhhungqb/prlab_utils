@@ -17,7 +17,7 @@ def make_check_point_folder(config={}, cp_base=None, cp_name=None):
     :param cp_name:
     :return: path of cp, best cp, csv file path
     """
-    path = config['path']
+    path = config['path'] if config.get('model_path', None) is None else config['model_path']
     path = path if isinstance(path, Path) else Path(path)
     if cp_name is None:
         cp_name = "{}".format(time.strftime("%Y.%m.%d-%H.%M"))
@@ -26,6 +26,10 @@ def make_check_point_folder(config={}, cp_base=None, cp_name=None):
     cp_path = cp_path / cp_name
     best_name = cp_path / "best"
     csvLog = cp_path / "loger"
+
+    # write configure to easy track later, could not write JSON because some object inside config
+    txtwriter = cp_path / 'configure.txt'
+    txtwriter.write_text(str(config))
 
     return cp_path, best_name, csvLog
 
@@ -68,7 +72,8 @@ def get_file_rec(path):
     ls = path.ls()
     files = [o for o in ls if o.is_file()]
     for cfolder in ls:
-        files.extend(get_file_rec(cfolder))
+        if cfolder.is_dir():
+            files.extend(get_file_rec(cfolder))
 
     return files
 
