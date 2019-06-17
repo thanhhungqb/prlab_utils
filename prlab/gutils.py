@@ -28,6 +28,7 @@ def make_check_point_folder(config={}, cp_base=None, cp_name=None):
     csvLog = cp_path / "loger"
 
     # write configure to easy track later, could not write JSON because some object inside config
+    cp_path.mkdir()
     txtwriter = cp_path / 'configure.txt'
     txtwriter.write_text(str(config))
 
