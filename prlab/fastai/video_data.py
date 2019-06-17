@@ -1,9 +1,10 @@
 from pathlib import Path
 
+import PIL
 import numpy as np
 import torch
 from fastai.core import ItemBase
-from fastai.vision import ImageList, open_image, Image, crop_pad
+from fastai.vision import ImageList, open_image, Image, crop_pad, pil2tensor
 from torch import Tensor
 
 """
@@ -165,3 +166,21 @@ class CropImageList(ImageList):
         cropped = crop_pad(img, size=size, row_pct=center[0], col_pct=center[1])
 
         return cropped
+
+
+class YCbCrImageList(ImageList):
+    """
+    three channel of YCbCr Image (instead RGB as normal)
+    """
+
+    def __init__(self, items, **kwargs):
+        super(YCbCrImageList, self).__init__(items, **kwargs)
+
+    def get(self, i):
+        fn = self.items[i]
+
+        img = PIL.Image.open(fn).convert('YCbCr')
+        channel3 = pil2tensor(img, np.float32)
+        channel3.div_(255)
+
+        return Image(channel3)
