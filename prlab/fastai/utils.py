@@ -1,4 +1,4 @@
-from builtins import super
+from builtins import super, Exception
 from typing import Any
 
 import matplotlib.pyplot as plt
@@ -13,7 +13,39 @@ from torch.autograd import Variable
 from torch.nn.functional import log_softmax
 
 
+class SaveModelCallbackTTA(SaveModelCallback):
+    """A `SaveModelCallbackTTA` that saves the model when monitored quantity is best."""
+
+    def __init__(self, learn: Learner, monitor: str = 'accuracy', mode: str = 'max', every: str = 'improvement',
+                 name: str = 'bestmodel_tta', step: int = 3, scale=1.1, monitor_func=accuracy, is_mul=True):
+        super().__init__(learn, monitor=monitor, mode=mode, every=every, name=name)
+        self.step = step
+        self.scale = scale
+        self.monitor_func = monitor_func
+        self.is_mul = is_mul
+
+    def on_epoch_end(self, epoch: int, **kwargs: Any) -> None:
+        """Compare the value monitored to its best score and maybe save the model."""
+
+        if epoch % self.step == 0:
+            if self.every == "epoch":
+                self.learn.save(f'{self.name}_{epoch}')
+            else:  # every="improvement"
+                val, tta_val = test_image_summary(self.learn, scale=self.scale, monitor_func=self.monitor_func,
+                                                  k_tta=1,
+                                                  is_plt=False)
+                current = np.max(tta_val)
+
+                if current is not None and self.operator(current, self.best):
+                    print(f'Better model found at epoch {epoch} with {self.monitor} value: {current}.')
+                    self.best = current
+                    self.learn.save(f'{self.name}_{epoch}_{current}') if self.is_mul else \
+                        self.learn.save(f'{self.name}')
+
+
 class ECSVLogger(CSVLogger):
+    """Extend CSVLogger, flush each epoch to easy track"""
+
     def __init__(self, learn: Learner, filename: str = 'history', append: bool = False):
         super(ECSVLogger, self).__init__(learn, filename, append)
 
@@ -142,7 +174,8 @@ def dice_loss(input, target):
     return dice_total
 
 
-def test_image_summary(learn, data_test=None, scale=1.1, is_normalize=True):
+def test_image_summary(learn, data_test=None, scale=1.1, is_normalize=True, monitor_func=accuracy, k_tta=3,
+                       is_plt=True):
     """
     Summary result with learn. Use on ipynb.
     Test data must on "valid" of data_set, else use Valid
@@ -150,22 +183,31 @@ def test_image_summary(learn, data_test=None, scale=1.1, is_normalize=True):
     :param data_test:
     :param scale: image scale, default is 1.1
     :param is_normalize: if want normalize confusion matrix
+    :param monitor_func: monitor function, default is accuracy
+    :param k_tta: number of tta
+    :param is_plt: plot or not
     :return:
     """
     if data_test is not None:
         learn.data = data_test
     interp = ClassificationInterpretation.from_learner(learn)
 
-    interp.plot_confusion_matrix(figsize=(10, 10), dpi=60, normalize=is_normalize)
-    plt.show()
+    try:
+        if is_plt:
+            interp.plot_confusion_matrix(figsize=(10, 10), dpi=60, normalize=is_normalize)
+            plt.show()
+    except Exception as e:
+        print(e)
 
     preds, y = learn.get_preds(with_loss=False)
-    acc = accuracy(preds, y)
+    monitor_val = monitor_func(preds, y)
 
-    ys, y = learn.TTA(ds_type=DatasetType.Valid, scale=scale)
-    tta_acc = accuracy(ys, y)
+    tta_monitor_val = []
+    for _ in range(k_tta):
+        ys, y = learn.TTA(ds_type=DatasetType.Valid, scale=scale)
+        tta_monitor_val.append(monitor_func(ys, y))
 
-    return acc, tta_acc
+    return monitor_val, tta_monitor_val
 
 
 top2_acc = partial(top_k_accuracy, k=2)
