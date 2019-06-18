@@ -1,20 +1,32 @@
+from builtins import super
+from typing import Any
+
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from fastai import callbacks
 from fastai.basic_data import DatasetType
-from fastai.callbacks import SaveModelCallback, partial
+from fastai.callbacks import SaveModelCallback, partial, CSVLogger, Learner, Tensor, MetricsList
 from fastai.metrics import top_k_accuracy, accuracy
 from fastai.train import ClassificationInterpretation
 from torch.autograd import Variable
 from torch.nn.functional import log_softmax
 
 
+class ECSVLogger(CSVLogger):
+    def __init__(self, learn: Learner, filename: str = 'history', append: bool = False):
+        super(ECSVLogger, self).__init__(learn, filename, append)
+
+    def on_epoch_end(self, epoch: int, smooth_loss: Tensor, last_metrics: MetricsList, **kwargs: Any) -> bool:
+        super().on_epoch_end(epoch, smooth_loss, last_metrics, **kwargs)
+        self.file.flush()  # to make sure write to disk
+
+
 def get_callbacks(best_name='best', monitor='accuracy', csv_filename='log', csv_append=True):
     out = [
         partial(SaveModelCallback, monitor=monitor, name=best_name),
         callbacks.TrackerCallback,
-        partial(callbacks.CSVLogger, filename=csv_filename, append=csv_append)
+        partial(ECSVLogger, filename=csv_filename, append=csv_append)
     ]
     return out
 
