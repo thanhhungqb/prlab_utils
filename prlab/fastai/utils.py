@@ -53,7 +53,7 @@ def dificult_weight_loss(y_preds, target, *args, **kwargs):
     return torch.mean(a)
 
 
-def prob_loss(target, y):
+def prob_loss(target, y, **kwargs):
     """
     This is a custom of SoftMaxCrossEntropy
     Loss when y input as raw probability instead a int number.
@@ -71,7 +71,7 @@ def prob_loss(target, y):
     return torch.mean(a)
 
 
-def prob_acc(target, y):
+def prob_acc(target, y, **kwargs):
     """
     accuracy when y input as raw probability instead a int number
     use when prob is not 1/0
