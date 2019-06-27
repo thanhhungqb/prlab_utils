@@ -188,6 +188,7 @@ def test_image_summary(learn, data_test=None, scale=1.1, is_normalize=True, moni
     :param is_plt: plot or not
     :return:
     """
+    data = learn.data  # backup
     if data_test is not None:
         learn.data = data_test
     interp = ClassificationInterpretation.from_learner(learn)
@@ -207,6 +208,8 @@ def test_image_summary(learn, data_test=None, scale=1.1, is_normalize=True, moni
         ys, y = learn.TTA(ds_type=DatasetType.Valid, scale=scale)
         tta_monitor_val.append(monitor_func(ys, y))
 
+    # restore data (maybe change to data_test) then make sure as before call this function
+    learn.data = data
     return monitor_val, tta_monitor_val
 
 
