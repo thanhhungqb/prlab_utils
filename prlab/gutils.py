@@ -12,6 +12,7 @@ Path.ls = lambda x: list(x.iterdir())
 def make_check_point_folder(config={}, cp_base=None, cp_name=None):
     """
     make a checkpoint folder and csv log
+    UPDATE best_name only 'best' instead full path, use cp for full
     :param config:
     :param cp_base: None for path, but usually in path/models
     :param cp_name:
@@ -24,11 +25,11 @@ def make_check_point_folder(config={}, cp_base=None, cp_name=None):
 
     cp_path = path / cp_base if cp_base is not None else path
     cp_path = cp_path / cp_name
-    best_name = cp_path / "best"
+    best_name = "best"
     csvLog = cp_path / "loger"
 
     # write configure to easy track later, could not write JSON because some object inside config
-    cp_path.mkdir(exist_ok=True)
+    cp_path.mkdir(parents=True, exist_ok=True)
     txtwriter = cp_path / 'configure.txt'
     txtwriter.write_text(str(config)) if not txtwriter.is_file() else None
 
