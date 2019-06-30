@@ -3,6 +3,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import sklearn
 from sklearn import preprocessing
 
 # add ls function to Path for easy to use
@@ -96,6 +97,31 @@ def load_df_img_data(path, index_keys='filename', bb_key='bb'):
     data[bb_key] = float_bb
 
     return data
+
+
+def resample_to_distribution(x, y, dis=[]):
+    """
+    Resampling to data x and label y to correct distribution
+    :param x: data X
+    :param y: label y, same size with x or None
+    :param dis: list int number, number of elements get each labels, if y number then list, else dict
+    :return: new_x, new_y
+    """
+    x = np.array(x) if isinstance(x, list) else x
+    y = np.array(y) if isinstance(y, list) else y
+    dis = {i: val for i, val in enumerate(dis)} if isinstance(dis, list) else dis
+
+    assert len(x) == len(y)
+    label_set = set(y)
+    assert len(label_set) == (len(dis) if not isinstance(dis, dict) else len(dis.keys()))
+
+    ss = {label: x[y == label] for label in label_set}
+    x_new, y_new = np.array([]), []
+    for label in label_set:
+        x_new = np.append(x_new, np.random.choice(ss[label], size=dis[label]))
+        y_new.extend([label] * dis[label])
+
+    return sklearn.utils.shuffle(np.stack(x_new), np.stack(y_new))
 
 
 def test_make_check_point_folder():
