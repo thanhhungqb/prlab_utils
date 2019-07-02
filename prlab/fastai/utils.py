@@ -13,6 +13,16 @@ from torch.autograd import Variable
 from torch.nn.functional import log_softmax
 
 
+def freeze_layer(x, flag=True):
+    """
+    :param x: layer
+    :param flag: true => freezee, false => trainable
+    :return:
+    """
+    for ele in x.parameters():
+        ele.requires_grad = not flag
+
+
 class SaveModelCallbackTTA(SaveModelCallback):
     """A `SaveModelCallbackTTA` that saves the model when monitored quantity is best."""
 
