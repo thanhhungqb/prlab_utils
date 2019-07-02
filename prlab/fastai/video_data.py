@@ -1,11 +1,5 @@
-from pathlib import Path
-
-import PIL
-import numpy as np
-import torch
-from fastai.core import ItemBase
-from fastai.vision import ImageList, open_image, Image, crop_pad, pil2tensor
-from torch import Tensor
+from fastai.vision import *
+from torch.utils.data import SequentialSampler
 
 """
 This file implement classes and function to apply to video that can be load and
@@ -185,3 +179,176 @@ class YCbCrImageList(ImageList):
         channel3.div_(255)
 
         return Image(channel3)
+
+
+# Related collate function
+# TODO now hard code to convert Category to int, need find the way to smarter
+def get_size_rec(b: ImageList, f_size=np.max):
+    """
+    Get biggest size to resize for all in batch
+    :param b:
+    :param f_size:
+    :return:
+    """
+    if is_listy(b): return f_size([get_size_rec(o) for o in b])
+    return f_size(b.size) if isinstance(b, Image) else 0
+
+
+def to_data_resize(b: ImageList, n_size=None):
+    """
+    Must resize to same size before convert to Tensor
+    Recursively map lists of items in `b ` to their wrapped data.
+    """
+    # resize to same size
+    if n_size is None:
+        n_size = get_size_rec(b)
+    n_size = int(n_size)
+
+    if is_listy(b): return [to_data_resize(o, n_size) for o in b]
+
+    return b.resize(size=n_size).data if isinstance(b, Image) else int(b)  # hard code at int, TODO check way to pass
+
+
+def resize_collate(batch: ItemsList) -> Tensor:
+    """Convert `batch` items to tensor data. see `data_collate`"""
+    return torch.utils.data.dataloader.default_collate(to_data_resize(batch))
+
+
+# -----------------------------------------------------------------------------
+
+
+class GroupRandomSampler(SequentialSampler):
+    """
+    implement random sampler in each groups, RandomSampler
+    need call new_crop_info and ... to update sampler and groups
+    work with SizeGroupedCropImageList
+    """
+
+    def __iter__(self):
+        if isinstance(self.data_source, SizeGroupedImageDataBunch):
+            self.data_source.size_group()  # make new random if have
+
+        return iter(range(len(self.data_source)))
+
+
+class SizeGroupedImageDataBunch(ImageDataBunch):
+    """
+    TODO note set size=None and apply resize after (in batch mode via collate?)
+    """
+
+    @classmethod
+    def create(cls, train_ds: Dataset, valid_ds: Dataset, test_ds: Optional[Dataset] = None, path: PathOrStr = '.',
+               bs: int = 64,
+               val_bs: int = None, num_workers: int = defaults.cpus, dl_tfms: Optional[Collection[Callable]] = None,
+               device: torch.device = None, collate_fn: Callable = resize_collate, no_check: bool = False,
+               **dl_kwargs) -> 'DataBunch':
+        """Create a `DataBunch` from `train_ds`, `valid_ds` and maybe `test_ds` with a batch size of `bs`.
+        Passes `**dl_kwargs` to `DataLoader()`"""
+        datasets = cls._init_ds(train_ds, valid_ds, test_ds)
+        val_bs = ifnone(val_bs, bs)
+
+        collate_fn = resize_collate
+
+        train_sampler = GroupRandomSampler(datasets[0].x)
+        train_dl = DataLoader(datasets[0], batch_size=bs, sampler=train_sampler, drop_last=True, **dl_kwargs)
+        dataloaders = [train_dl]
+
+        for ds in datasets[1:]:
+            sampler = GroupRandomSampler(ds.x)
+            dataloaders.append(DataLoader(ds, batch_size=val_bs, sampler=sampler, **dl_kwargs))
+        return cls(*dataloaders, path=path, device=device, dl_tfms=dl_tfms, collate_fn=collate_fn, no_check=no_check)
+
+
+class SizeGroupedCropImageList(CropImageList):
+    """
+    group by size (max w, h), number of group default is 10 (can be change)
+    bunch can make difference input size (image) on difference batch
+    """
+    _bunch = SizeGroupedImageDataBunch
+    _sampler = None
+    _n_group = 10
+    _groups = {}
+    _crop_info = None
+
+    def get(self, pos):
+
+        if self._sampler is None:
+            self.size_group()
+
+        i = self._sampler[pos]  # get by sampler not the order in items
+
+        fn = self.items[i]
+        img = self.open(fn)
+
+        img_width, img_heigh = img.size
+
+        size, center = self._crop_info[i]
+        cropped = crop_pad(img, size=size, row_pct=center[0] / img_width, col_pct=center[1] / img_heigh)
+
+        self.sizes[i] = cropped.size
+        return cropped
+
+    def size_group(self, n_group=None):
+        """
+        call for the first get command or outside to make new order (in case random)
+        :param n_group:
+        :return:
+        """
+        if n_group is not None:
+            self._n_group = n_group
+
+        self.new_crop_info()
+
+        s_size = np.array([np.max(list(o)) for c, o in self._crop_info.items()])
+
+        groups = {i: [] for i in range(self._n_group)}
+        vv = [np.percentile(s_size, 100 * i / self._n_group) for i in range(1, self._n_group + 1)]
+        for pos in range(len(self.items)):
+            _, size = self._crop_info[pos]
+
+            p_group = self._n_group - 1
+            for i in range(self._n_group):
+                n_size = np.max(size)
+                if n_size <= vv[i]:
+                    p_group = i
+                    break
+            groups[p_group].append(pos)
+
+        self._groups = groups
+        self._sampler = np.concatenate([np.random.permutation(val) for k, val in groups.items()]).astype(np.int)
+        return self
+
+    def crop_calc(self, i):
+        """
+        Calculate and store center, (w,h) to crop for items
+        :param i: position in items
+        :return:
+        """
+        item = self.items[i]
+
+        # Crop by info from self.df
+        item_path = item if isinstance(item, Path) else Path(item)
+
+        # select area to crop from df['bb']
+        center_x, center_y, dx, dy = self.df.loc[item_path.name, 'bb']
+
+        s_zoom = np.random.uniform(self.min_scale, self.max_scale, 4) \
+            if self.scale_type == 'random' else [self.max_scale] * 4
+
+        left, right = center_x - dx / 2 * s_zoom[0], center_x + dx / 2 * s_zoom[1]
+        top, bottom = center_y - dy / 2 * s_zoom[2], center_y + dy / 2 * s_zoom[3]
+
+        # refine if out of size
+        # left, top, right, bottom = max(1, left), max(1, top), min(img_width - 1, right), min(img_heigh - 1, bottom)
+        size = int(bottom - top), int(right - left)
+        center = int(right + left) // 2, int(bottom + top) // 2
+        return center, size
+
+    def new_crop_info(self):
+        """
+        update a new resize for items
+        :return:
+        """
+        self._crop_info = {}
+        for i in range(len(self.items)):
+            self._crop_info[i] = self.crop_calc(i)
