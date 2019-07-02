@@ -165,6 +165,7 @@ class CropImageList(ImageList):
         # cropped = img.crop((left, top, right, bottom))
         cropped = crop_pad(img, size=size, row_pct=center[0], col_pct=center[1])
 
+        self.sizes[i] = cropped.size
         return cropped
 
 
