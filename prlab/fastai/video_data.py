@@ -183,6 +183,7 @@ class YCbCrImageList(ImageList):
 
 # Related collate function
 # TODO now hard code to convert Category to int, need find the way to smarter
+# TODO need limit maximum size to 512? and related to bs
 def get_size_rec(b: ImageList, f_size=np.max):
     """
     Get biggest size to resize for all in batch
@@ -203,6 +204,7 @@ def to_data_resize(b: ImageList, n_size=None):
     if n_size is None:
         n_size = get_size_rec(b)
     n_size = int(n_size)
+    n_size = 512 if n_size > 512 else n_size
 
     if is_listy(b): return [to_data_resize(o, n_size) for o in b]
 
@@ -247,7 +249,7 @@ class SizeGroupedImageDataBunch(ImageDataBunch):
         datasets = cls._init_ds(train_ds, valid_ds, test_ds)
         val_bs = ifnone(val_bs, bs)
 
-        collate_fn = resize_collate
+        collate_fn = resize_collate  # TODO fix hardcoded use param instead
 
         train_sampler = GroupRandomSampler(datasets[0].x)
         train_dl = DataLoader(datasets[0], batch_size=bs, sampler=train_sampler, drop_last=True, **dl_kwargs)
