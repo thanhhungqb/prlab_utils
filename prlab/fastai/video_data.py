@@ -97,6 +97,7 @@ class VideoFramesList(ImageList):
 
 class CropImageList(ImageList):
     """
+    TODO wrong implement of crop, see `SizeGroupedCropImageList` to fix
     Load and crop image on the fly.
     Use Dataframe index: name, bb: [left top right bottom]
     """
@@ -111,7 +112,7 @@ class CropImageList(ImageList):
 
         [self.copy_new.append(o) for o in ['df', 'scale_type', 'max_scale', 'min_scale']]
 
-    def set_values(self, df=None, scale_type=None, max_scale=None, min_scale=None):
+    def set_values(self, df=None, scale_type=None, max_scale=None, min_scale=None, bunch=None):
         """
         Set values and return self to easy to chain
         :param df:
@@ -131,6 +132,9 @@ class CropImageList(ImageList):
 
         if min_scale is not None:
             self.min_scale = min_scale
+
+        if bunch is not None:
+            self._bunch = bunch
 
         return self
 
@@ -183,6 +187,7 @@ class YCbCrImageList(ImageList):
 
 # Related collate function
 # TODO now hard code to convert Category to int, need find the way to smarter
+# TODO need limit maximum size to 512? and related to bs
 def get_size_rec(b: ImageList, f_size=np.max):
     """
     Get biggest size to resize for all in batch
@@ -203,10 +208,25 @@ def to_data_resize(b: ImageList, n_size=None):
     if n_size is None:
         n_size = get_size_rec(b)
     n_size = int(n_size)
+    n_size = 224 if n_size > 224 else n_size
 
-    if is_listy(b): return [to_data_resize(o, n_size) for o in b]
+    if is_listy(b):
+        out = [to_data_resize(o, n_size) for o in b]
+        tmp = []
+        for i in range(len(out) // 2):
+            if out[i * 2] is not None and out[i * 2 + 1] is not None:
+                tmp.append(out[i * 2])
+                tmp.append(out[i * 2 + 1])
+        out = tmp
+        return out
 
-    return b.resize(size=n_size).data if isinstance(b, Image) else int(b)  # hard code at int, TODO check way to pass
+    try:
+        out = b.resize(size=n_size).data if isinstance(b, Image) else int(b)  # hard code at int, TODO check way to pass
+    except Exception as e:
+        print(e)
+        print(n_size, b)
+        return None
+    return out
 
 
 def resize_collate(batch: ItemsList) -> Tensor:
@@ -247,15 +267,16 @@ class SizeGroupedImageDataBunch(ImageDataBunch):
         datasets = cls._init_ds(train_ds, valid_ds, test_ds)
         val_bs = ifnone(val_bs, bs)
 
-        collate_fn = resize_collate
+        collate_fn = resize_collate  # TODO fix hardcoded use param instead
 
         train_sampler = GroupRandomSampler(datasets[0].x)
-        train_dl = DataLoader(datasets[0], batch_size=bs, sampler=train_sampler, drop_last=True, **dl_kwargs)
+        train_dl = DataLoader(datasets[0], batch_size=bs, sampler=train_sampler, drop_last=True,
+                              num_workers=num_workers, **dl_kwargs)
         dataloaders = [train_dl]
 
         for ds in datasets[1:]:
             sampler = GroupRandomSampler(ds.x)
-            dataloaders.append(DataLoader(ds, batch_size=val_bs, sampler=sampler, **dl_kwargs))
+            dataloaders.append(DataLoader(ds, batch_size=val_bs, sampler=sampler, num_workers=num_workers, **dl_kwargs))
         return cls(*dataloaders, path=path, device=device, dl_tfms=dl_tfms, collate_fn=collate_fn, no_check=no_check)
 
 
@@ -269,6 +290,7 @@ class SizeGroupedCropImageList(CropImageList):
     _n_group = 10
     _groups = {}
     _crop_info = None
+    _new_center = {}
 
     def get(self, pos):
 
@@ -280,10 +302,29 @@ class SizeGroupedCropImageList(CropImageList):
         fn = self.items[i]
         img = self.open(fn)
 
-        img_width, img_heigh = img.size
+        img_heigh, img_width = img.size
 
-        size, center = self._crop_info[i]
-        cropped = crop_pad(img, size=size, row_pct=center[0] / img_width, col_pct=center[1] / img_heigh)
+        center, size = self._crop_info[i]
+
+        # refine size and center to not outside image
+        left, right = center[0] - size[0] / 2, center[0] + size[0] / 2
+        top, bottom = center[1] - size[1] / 2, center[1] + size[1] / 2
+        left, top, right, bottom = max(1., left), max(1., top), min(img_width - 1, right), min(img_heigh - 1, bottom)
+        center = round(left + right) // 2, round(top + bottom) // 2
+        size = round(right - left), round(bottom - top)
+        old_bb = np.array(self.df.loc[self.items[i].name, 'bb'])
+        self._new_center[i] = old_bb[:2] - np.array([left, top])
+
+        self._new_center[i] = self._new_center[i][0], self._new_center[i][1], old_bb[2], old_bb[3]
+
+        row_pct = (center[1] - size[1] / 2) / (img_heigh - size[1]) if img_heigh > size[1] else 0.5
+        col_pct = (center[0] - size[0] / 2) / (img_width - size[0]) if img_width > size[0] else 0.5
+        size = size[1], size[0]  # change to rows, cols
+        cropped = crop(img, size=size, row_pct=row_pct, col_pct=col_pct)
+
+        # TODO padding to same size (w, h)
+        # rsz = [ResizeMethod.CROP, ResizeMethod.PAD, ResizeMethod.SQUISH][1]  # choose 1 or 2
+        # cropped = cropped.apply_tfms([crop_pad()], size=size, resize_method=rsz, padding_mode='zeros')
 
         self.sizes[i] = cropped.size
         return cropped
@@ -340,7 +381,7 @@ class SizeGroupedCropImageList(CropImageList):
 
         # refine if out of size
         # left, top, right, bottom = max(1, left), max(1, top), min(img_width - 1, right), min(img_heigh - 1, bottom)
-        size = int(bottom - top), int(right - left)
+        size = int(right - left), int(bottom - top)  # w, h
         center = int(right + left) // 2, int(bottom + top) // 2
         return center, size
 
