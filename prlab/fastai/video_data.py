@@ -248,7 +248,7 @@ class GroupRandomSampler(SequentialSampler):
         if isinstance(self.data_source, SizeGroupedImageDataBunch):
             self.data_source.size_group()  # make new random if have
 
-        return iter(range(len(self.data_source)))
+        return iter(self.data_source._sampler)
 
 
 class SizeGroupedImageDataBunch(ImageDataBunch):
@@ -291,13 +291,14 @@ class SizeGroupedCropImageList(CropImageList):
     _groups = {}
     _crop_info = None
     _new_center = {}
+    _resize_method = [ResizeMethod.CROP, ResizeMethod.PAD, ResizeMethod.SQUISH][2]  # choose 1 or 2
 
     def get(self, pos):
 
         if self._sampler is None:
             self.size_group()
 
-        i = self._sampler[pos]  # get by sampler not the order in items
+        i = pos  # self._sampler[pos]  # get by sampler not the order in items
 
         fn = self.items[i]
         img = self.open(fn)
@@ -322,9 +323,9 @@ class SizeGroupedCropImageList(CropImageList):
         size = size[1], size[0]  # change to rows, cols
         cropped = crop(img, size=size, row_pct=row_pct, col_pct=col_pct)
 
-        # TODO padding to same size (w, h)
-        # rsz = [ResizeMethod.CROP, ResizeMethod.PAD, ResizeMethod.SQUISH][1]  # choose 1 or 2
-        # cropped = cropped.apply_tfms([crop_pad()], size=size, resize_method=rsz, padding_mode='zeros')
+        # padding to same size max(w, h)
+        nsize = size[0] if size[0] > size[1] else size[1]
+        cropped = cropped.apply_tfms([crop_pad()], size=nsize, resize_method=self._resize_method, padding_mode='zeros')
 
         self.sizes[i] = cropped.size
         return cropped
