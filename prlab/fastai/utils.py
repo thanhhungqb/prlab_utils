@@ -6,9 +6,10 @@ import numpy as np
 import torch
 from fastai import callbacks
 from fastai.basic_data import DatasetType
-from fastai.callbacks import SaveModelCallback, partial, CSVLogger, Learner, Tensor, MetricsList
+from fastai.callbacks import SaveModelCallback, partial, CSVLogger, Learner, Tensor, MetricsList, Callback
 from fastai.metrics import top_k_accuracy, accuracy
 from fastai.train import ClassificationInterpretation
+from fastai.vision import imagenet_stats
 from torch.autograd import Variable
 from torch.nn.functional import log_softmax
 
@@ -62,6 +63,37 @@ class ECSVLogger(CSVLogger):
     def on_epoch_end(self, epoch: int, smooth_loss: Tensor, last_metrics: MetricsList, **kwargs: Any) -> bool:
         super().on_epoch_end(epoch, smooth_loss, last_metrics, **kwargs)
         self.file.flush()  # to make sure write to disk
+
+
+class DataArgCallBack(Callback):
+    """partial(DataArgCallBack, src=src, label_func=label_func, config=config)
+    to persitent of valid, src is after split valid
+    label_from_func do the random new item order (second list?)
+    Use with `LRModel`
+    """
+
+    def __init__(self, learn: Learner, src, label_func, config, transform_size=None, normalize=imagenet_stats,
+                 **kwargs):
+        super(DataArgCallBack, self).__init__()
+        self.learn = learn
+        self.src = src
+        self.label_func = label_func
+        self.config = config
+        self.transform_size = transform_size
+        self.normalize = normalize
+
+    def on_epoch_end(self, epoch: int, smooth_loss: Tensor, last_metrics: MetricsList, **kwargs: Any) -> bool:
+        # do with data
+        n_data = (self.src
+                  .label_from_func(self.label_func)
+                  .transform([[], []], size=self.transform_size)
+                  .databunch(bs=self.config['bs'])
+                  )
+
+        if self.normalize:
+            n_data = n_data.normalize(self.normalize)
+
+        self.learn.data = n_data
 
 
 def get_callbacks(best_name='best', monitor='accuracy', csv_filename='log', csv_append=True):
