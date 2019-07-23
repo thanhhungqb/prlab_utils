@@ -394,3 +394,56 @@ class SizeGroupedCropImageList(CropImageList):
         self._crop_info = {}
         for i in range(len(self.items)):
             self._crop_info[i] = self.crop_calc(i)
+
+
+class ImageTuple(ItemBase):
+    def __init__(self, img1, img2):
+        self.img1, self.img2 = img1, img2
+        self.obj, self.data = (img1, img2), [img1.data, img2.data]
+
+    def apply_tfms(self, tfms, **kwargs):
+        """
+        use tfms2 in kwargs for img2 if found
+        :param tfms:
+        :param kwargs:
+        :return:
+        """
+        self.img1 = self.img1.apply_tfms(tfms, **kwargs)
+        self.img2 = self.img2.apply_tfms(kwargs.get('tfms2', tfms), **kwargs)
+        self.data = [self.img1.data, self.img2.data]
+        return self
+
+    def to_one(self): return Image(torch.cat(self.data, 2))
+
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__} {list(self.data[0].size())} {list(self.data[1].size())}'
+
+
+class SelfRepresentImageList(ImageList):
+    """
+    label_func like that: label_func = lambda o: 0 if target_func1(o[0]) == target_func1(o[1]) else 1
+    """
+
+    def __init__(self, base_list, pos=None, **kwargs):
+        kwargs['items'] = base_list.items
+        super().__init__(**kwargs)
+        # super().__init__(**kwargs)
+
+        self.base_list = base_list
+
+        self.pos = np.random.permutation(len(base_list.items))
+
+        [self.copy_new.append(o)
+         for o in ['base_list', 'pos']]
+
+    def get(self, i):
+        img1 = self.base_list.get(i)
+        img2 = self.base_list.get(self.pos[i])
+        return ImageTuple(img1, img2)
+
+    def label_from_func(self, func: Callable, label_cls: Callable = None, **kwargs) -> 'LabelList':
+        "Apply `func` to every input to get its label."
+        self.pos = np.random.permutation(len(self.items))
+        itemsB = [self.items[o] for o in self.pos]
+
+        return self._label_from_list([func(o) for o in zip(self.items, itemsB)], label_cls=label_cls, **kwargs)
