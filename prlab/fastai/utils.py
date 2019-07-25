@@ -42,9 +42,9 @@ class SaveModelCallbackTTA(SaveModelCallback):
             if self.every == "epoch":
                 self.learn.save(f'{self.name}_{epoch}')
             else:  # every="improvement"
-                val, tta_val = test_image_summary(self.learn, scale=self.scale, monitor_func=self.monitor_func,
-                                                  k_tta=1,
-                                                  is_plt=False)
+                val, tta_val, *_ = test_image_summary(self.learn, scale=self.scale, monitor_func=self.monitor_func,
+                                                      k_tta=1,
+                                                      is_plt=False)
                 current = np.max(tta_val)
 
                 if current is not None and self.operator(current, self.best):
@@ -246,13 +246,15 @@ def test_image_summary(learn, data_test=None, scale=1.1, is_normalize=True, moni
     monitor_val = monitor_func(preds, y)
 
     tta_monitor_val = []
+    preds_y = []
     for _ in range(k_tta):
         ys, y = learn.TTA(ds_type=DatasetType.Valid, scale=scale)
+        preds_y.append((ys, y))
         tta_monitor_val.append(monitor_func(ys, y))
 
     # restore data (maybe change to data_test) then make sure as before call this function
     learn.data = data
-    return monitor_val, tta_monitor_val
+    return monitor_val, tta_monitor_val, preds_y
 
 
 top2_acc = partial(top_k_accuracy, k=2)
