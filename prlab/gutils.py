@@ -124,6 +124,46 @@ def resample_to_distribution(x, y, dis=[]):
     return sklearn.utils.shuffle(np.stack(x_new), np.stack(y_new))
 
 
+def load_func_by_name(func_str):
+    """
+    Load function by full name, e.g. pcam.models.simple_transfer_model_xavier
+    :param func_str: package.name
+    :return: fn, module
+    """
+    mod_name, func_name = func_str.rsplit('.', 1)
+    mod = importlib.import_module(mod_name)
+    func = getattr(mod, func_name)
+    return func, mod
+
+
+def save_config_info(config, save_path='.'):
+    """
+    Save configure (dict) to file after add more detail about date, time, git, ...
+    :param config:
+    :param save_path:
+    :return:
+    """
+    current_dt = datetime.datetime.now()
+    config_copy = copy.deepcopy(config)
+    config_copy['save time'] = str(current_dt)
+
+    try:
+        # add git info
+        from git import Repo
+        repo = Repo('.')
+        master = repo.heads.master
+        config_copy['git_info'] = {}
+        config_copy['git_info']['branch'] = repo.active_branch.name
+        config_copy['git_info']['last-hash'] = repo.active_branch.log()[-1].newhexsha
+        config_copy['git_info']['last-master-hash'] = master.log()[-1].newhexsha
+        config_copy['git_info']['remote-url'] = repo.remotes[0].url
+    except:
+        pass
+
+    with open("{}/train_config.json".format(save_path), "w") as fw:
+        json.dump(config_copy, fw, indent=2, sort_keys=True)
+
+
 def test_make_check_point_folder():
     print(make_check_point_folder("/tmp"))
 
