@@ -96,7 +96,7 @@ class DataArgCallBack(Callback):
         self.learn.data = n_data
 
 
-def get_callbacks(best_name='best', monitor='accuracy', csv_filename='log', csv_append=True):
+def get_callbacks(best_name='best', monitor='valid_loss', csv_filename='log', csv_append=True):
     out = [
         partial(SaveModelCallback, monitor=monitor, name=best_name),
         callbacks.TrackerCallback,
