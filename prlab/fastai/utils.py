@@ -350,4 +350,5 @@ top3_acc = partial(top_k_accuracy, k=3)
 top5_acc = partial(top_k_accuracy, k=5)
 top2_acc.__name__ = 'top2_accuracy'
 top3_acc.__name__ = 'top3_accuracy'
+top5_acc.__name__ = 'top5_accuracy'
 tmetrics = [accuracy, top2_acc, top3_acc]
