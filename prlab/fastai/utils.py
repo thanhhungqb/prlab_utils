@@ -1,4 +1,5 @@
 from builtins import super, Exception
+from pathlib import Path
 from typing import Any
 
 import matplotlib.pyplot as plt
@@ -50,6 +51,93 @@ class SaveModelCallbackTTA(SaveModelCallback):
                 if current is not None and self.operator(current, self.best):
                     print(f'Better model found at epoch {epoch} with {self.monitor} value: {current}.')
                     self.best = current
+                    self.learn.save(f'{self.name}_{epoch}_{current}') if self.is_mul else \
+                        self.learn.save(f'{self.name}')
+
+
+class CheckpointLossVarianceCallback(SaveModelCallback):
+    """TODO not finish yet. run get_preds many times, save monitor values and calculate variance
+    compare with latest variance and choose the best (lower or higher)
+    Callback that saves the model when monitored quantity variance (in some TTA) is best (lower or higher dependent
+    on monitor."""
+
+    def __init__(self, learn: Learner, monitor: str = 'accuracy', mode: str = 'max', every: str = 'improvement',
+                 name: str = 'bestmodel_variance', step: int = 1, scale=1., monitor_func=accuracy, is_mul=False):
+        super().__init__(learn, monitor=monitor, mode=mode, every=every, name=name)
+        self.step = step
+        self.scale = scale
+        self.monitor_func = monitor_func
+        self.is_mul = is_mul
+        self.n_times = 8
+
+    def on_epoch_end(self, epoch: int, **kwargs: Any) -> None:
+        """Compare the value monitored to its best score and maybe save the model."""
+
+        if epoch % self.step == 0:
+            if self.every == "epoch":
+                self.learn.save(f'{self.name}_{epoch}')
+            else:  # every="improvement"
+                tta_val = []
+                for i in range(self.n_times):
+                    preds, ys, losses = self.learn.get_preds(with_loss=True)
+                    tta_val.append(accuracy(preds, ys))
+                    # TODO now only support accuracy, need support loss later
+
+                m, val = np.mean(tta_val), np.std(tta_val)
+                current = np.mean(tta_val) - np.std(tta_val)
+
+                if current is not None and self.operator(current, self.best):
+                    print(f'Better model found at epoch {epoch} with {self.monitor} value: {current}.')
+                    self.best = current
+                    (Path(self.learn.model_dir) / 'var.log').open('a').write(f'{epoch} {self.best} ({m} + {val}) \n')
+
+                    self.learn.save(f'{self.name}_{epoch}_{current}') if self.is_mul else \
+                        self.learn.save(f'{self.name}')
+
+
+class CheckpointBestUACallback(SaveModelCallback):
+    """TODO not finish yet. run get_preds many times, save monitor values and calculate variance
+    compare with latest variance and choose the best (lower or higher)
+    Callback that saves the model when monitored quantity variance (in some TTA) is best (lower or higher dependent
+    on monitor."""
+
+    def __init__(self, learn: Learner, name: str = 'bestmodel_variance', step: int = 1, scale=1., is_mul=False):
+        super().__init__(learn, monitor='accuracy', mode='max', every='improvement', name=name)
+        self.monitor = 'accuracy'
+        self.step = step
+        self.scale = scale
+        self.monitor_func = accuracy
+        self.is_mul = is_mul
+        self.n_times = 4
+
+    def on_epoch_end(self, epoch: int, **kwargs: Any) -> None:
+        """Compare the value monitored to its best score and maybe save the model."""
+
+        if epoch % self.step == 0:
+            if self.every == "epoch":
+                self.learn.save(f'{self.name}_{epoch}')
+            else:  # every="improvement"
+                tta_val = []
+                for i in range(self.n_times):
+                    preds, ys, losses = self.learn.get_preds(with_loss=True)
+                    # acc = accuracy(preds, ys)
+                    preds, ys = preds.numpy(), ys.numpy()
+                    preds = preds.argmax(axis=1)
+
+                    # for label in range(4):
+                    #     print('check', acc, (ys == label), (preds == ys),
+                    #           (preds == ys)[ys == label], ys)
+                    a = [(preds == ys)[ys == label].sum() / (ys == label).sum() for label in range(4)]
+                    tta_val.append(np.mean(a))
+
+                m, val = np.mean(tta_val), np.std(tta_val)
+                current = m
+
+                if current is not None and self.operator(current, self.best):
+                    print(f'Better model found at epoch {epoch} with {self.monitor} value: {current}.')
+                    self.best = current
+                    (Path(self.learn.model_dir) / 'var.log').open('a').write(f'{epoch} {self.best} ({m} + {val}) \n')
+
                     self.learn.save(f'{self.name}_{epoch}_{current}') if self.is_mul else \
                         self.learn.save(f'{self.name}')
 
@@ -259,6 +347,7 @@ def test_image_summary(learn, data_test=None, scale=1.1, is_normalize=True, moni
 
 top2_acc = partial(top_k_accuracy, k=2)
 top3_acc = partial(top_k_accuracy, k=3)
+top5_acc = partial(top_k_accuracy, k=5)
 top2_acc.__name__ = 'top2_accuracy'
 top3_acc.__name__ = 'top3_accuracy'
 tmetrics = [accuracy, top2_acc, top3_acc]
