@@ -1,4 +1,5 @@
 import importlib
+import json
 import time
 from pathlib import Path
 
@@ -34,6 +35,11 @@ def make_check_point_folder(config={}, cp_base=None, cp_name=None):
     cp_path.mkdir(parents=True, exist_ok=True)
     txtwriter = cp_path / 'configure.txt'
     txtwriter.write_text(str(config)) if not txtwriter.is_file() else None
+    try:
+        with open(cp_path / 'configure.json', 'w') as f:
+            json.dump(config, f)
+    except Exception as e:
+        print('warning: ', e)
 
     return cp_path, best_name, csvLog
 
