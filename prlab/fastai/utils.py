@@ -28,13 +28,14 @@ def freeze_layer(x, flag=True):
 class SaveModelCallbackTTA(SaveModelCallback):
     """A `SaveModelCallbackTTA` that saves the model when monitored quantity is best."""
 
-    def __init__(self, learn: Learner, monitor: str = 'accuracy', mode: str = 'max', every: str = 'improvement',
+    def __init__(self, learn: Learner, monitor: str = 'accuracy', mode: str = 'auto', every: str = 'improvement',
                  name: str = 'bestmodel_tta', step: int = 3, scale=1.1, monitor_func=accuracy, is_mul=True):
         super().__init__(learn, monitor=monitor, mode=mode, every=every, name=name)
         self.step = step
         self.scale = scale
         self.monitor_func = monitor_func
         self.is_mul = is_mul
+        self.f = np.min if 'loss' in monitor else np.max
 
     def on_epoch_end(self, epoch: int, **kwargs: Any) -> None:
         """Compare the value monitored to its best score and maybe save the model."""
@@ -46,7 +47,7 @@ class SaveModelCallbackTTA(SaveModelCallback):
                 val, tta_val, *_ = test_image_summary(self.learn, scale=self.scale, monitor_func=self.monitor_func,
                                                       k_tta=1,
                                                       is_plt=False)
-                current = np.max(tta_val)
+                current = self.f(tta_val)
 
                 if current is not None and self.operator(current, self.best):
                     print(f'Better model found at epoch {epoch} with {self.monitor} value: {current}.')
