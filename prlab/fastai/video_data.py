@@ -7,6 +7,41 @@ word with fastai
 """
 
 
+def convert_to_fastai_crop_format(left, top, w, h, img_width, img_height):
+    """
+    :param left: left to crop
+    :param top:  top of crop
+    :param w:  width of crop
+    :param h:  height of crop
+    :param img_width: original image width
+    :param img_height: original image height
+    :return: (size, row_pct, col_pct) used to pass to fastai.vision.crop
+    """
+    right, bottom = left + w, top + h
+    left, top, right, bottom = max(1., left), max(1., top), min(img_width - 1, right), min(img_height - 1, bottom)
+    center = round(left + right) // 2, round(top + bottom) // 2
+    size = round(right - left), round(bottom - top)
+    # old_bb = np.array(self.df.loc[self.items[i].name, 'bb'])
+    # self._new_center[i] = old_bb[:2] - np.array([left, top])
+
+    # self._new_center[i] = self._new_center[i][0], self._new_center[i][1], old_bb[2], old_bb[3]
+
+    row_pct = (center[1] - size[1] / 2) / (img_height - size[1]) if img_height > size[1] else 0.5
+    col_pct = (center[0] - size[0] / 2) / (img_width - size[0]) if img_width > size[0] else 0.5
+    size = size[1], size[0]  # change to rows, cols
+
+    return size, row_pct, col_pct
+
+
+def crop_img(img_path, size, row_pct, col_pct):
+    # convert bbox to format of crop
+    img = open_image(img_path)
+
+    cropped = crop(img, size=size, row_pct=row_pct, col_pct=col_pct)
+
+    return cropped
+
+
 def next_k_frames_file(fpath, k=30, prefix="frame"):
     """
     Next k frame file names with form: {prefix}{number}.{suffix}
