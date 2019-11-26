@@ -225,7 +225,7 @@ def prob_loss_raw(target, y, **kwargs):
     :param y: [0.7 0.2 0.1]
     :return:
     """
-    y = y[:, :7]
+    # y = y[:, :7]
     l_softmax = log_softmax(target, 1)
 
     a = -y * l_softmax
