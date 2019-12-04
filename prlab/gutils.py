@@ -12,6 +12,25 @@ from sklearn import preprocessing
 Path.ls = lambda x: list(x.iterdir())
 
 
+def to_json_writeable(js):
+    """
+    Convert js in JSON to JSON writeable to file, means only str, number, list
+    :param js:
+    :return:
+    """
+    if isinstance(js, (int, float)):
+        return js
+    if isinstance(js, str):
+        return js
+    if isinstance(js, (tuple, list)):
+        return [to_json_writeable(o) for o in js]
+    if isinstance(js, dict):
+        return {k: to_json_writeable(v) for k, v in js.items()}
+
+    # other wise, try to convert to str
+    return str(js)
+
+
 def make_check_point_folder(config={}, cp_base=None, cp_name=None):
     """
     make a checkpoint folder and csv log
@@ -37,7 +56,7 @@ def make_check_point_folder(config={}, cp_base=None, cp_name=None):
     txtwriter.write_text(str(config)) if not txtwriter.is_file() else None
     try:
         with open(cp_path / 'configure.json', 'w') as f:
-            json.dump(config, f)
+            json.dump(to_json_writeable(config), f, indent=2)
     except Exception as e:
         print('warning: ', e)
 

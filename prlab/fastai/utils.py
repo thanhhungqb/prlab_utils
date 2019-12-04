@@ -14,6 +14,8 @@ from fastai.vision import imagenet_stats
 from torch.autograd import Variable
 from torch.nn.functional import log_softmax
 
+from outside.scikit.plot_confusion_matrix import plot_confusion_matrix
+
 
 def freeze_layer(x, flag=True):
     """
@@ -216,7 +218,7 @@ def dificult_weight_loss(y_preds, target, *args, **kwargs):
     return torch.mean(a)
 
 
-def prob_loss(target, y, **kwargs):
+def prob_loss_raw(target, y, **kwargs):
     """
     This is a custom of SoftMaxCrossEntropy
     Loss when y input as raw probability instead a int number.
@@ -225,13 +227,17 @@ def prob_loss(target, y, **kwargs):
     :param y: [0.7 0.2 0.1]
     :return:
     """
-    y = y[:, :7]
+    # y = y[:, :7]
     l_softmax = log_softmax(target, 1)
 
     a = -y * l_softmax
     a = torch.sum(a, dim=1)
 
-    return torch.mean(a)
+    return a
+
+
+def prob_loss(input, target, **kwargs):
+    return torch.mean(prob_loss_raw(input, target, **kwargs))
 
 
 def prob_acc(target, y, **kwargs):
@@ -344,6 +350,42 @@ def test_image_summary(learn, data_test=None, scale=1.1, is_normalize=True, moni
     # restore data (maybe change to data_test) then make sure as before call this function
     learn.data = data
     return monitor_val, tta_monitor_val, preds_y
+
+
+def run_learner_report(learn, data=None, data_test=None, class_names=None, ret_only_fig=True):
+    """
+
+    :param learn: fastai learn
+    :param data: for valid step
+    :param data_test: for test step, key still valid
+    :param class_names: numpy array of string
+    example np.array(['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral'])
+    :param ret_only_fig: True => only o, else return all acc
+    :return:
+    """
+    learn.data = data
+    preds, y, losses = learn.get_preds(with_loss=True)
+    ys, y = learn.TTA(ds_type=DatasetType.Valid, scale=1.1)
+    acc = accuracy(ys, y)
+    valid_acc1 = accuracy(preds, y)
+    valid_acc = acc
+
+    learn.data = data_test
+    preds, y, losses = learn.get_preds(with_loss=True)
+    ys, y = learn.TTA(ds_type=DatasetType.Valid, scale=1.1)
+    acc = accuracy(ys, y)
+
+    print('Valid acc', valid_acc1)
+    print('Valid acc TTA', valid_acc)
+
+    test_acc1 = accuracy(preds, y)
+    test_acc = acc
+    print('Test acc', test_acc1)
+    print('Test acc TTA', test_acc)
+
+    ys1 = torch.argmax(ys, dim=1)
+    o = plot_confusion_matrix(y, ys1, classes=class_names, normalize=True)
+    return o if ret_only_fig else (valid_acc1, valid_acc, test_acc1, test_acc, o)
 
 
 top2_acc = partial(top_k_accuracy, k=2)
