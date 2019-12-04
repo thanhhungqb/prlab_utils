@@ -18,13 +18,9 @@ def convert_to_fastai_crop_format(left, top, w, h, img_width, img_height):
     :return: (size, row_pct, col_pct) used to pass to fastai.vision.crop
     """
     right, bottom = left + w, top + h
-    left, top, right, bottom = max(1., left), max(1., top), min(img_width - 1, right), min(img_height - 1, bottom)
+    left, top, right, bottom = max(0., left), max(0., top), min(img_width - 1, right), min(img_height - 1, bottom)
     center = round(left + right) // 2, round(top + bottom) // 2
-    size = round(right - left), round(bottom - top)
-    # old_bb = np.array(self.df.loc[self.items[i].name, 'bb'])
-    # self._new_center[i] = old_bb[:2] - np.array([left, top])
-
-    # self._new_center[i] = self._new_center[i][0], self._new_center[i][1], old_bb[2], old_bb[3]
+    size = int(w), int(h)
 
     row_pct = (center[1] - size[1] / 2) / (img_height - size[1]) if img_height > size[1] else 0.5
     col_pct = (center[0] - size[0] / 2) / (img_width - size[0]) if img_width > size[0] else 0.5
