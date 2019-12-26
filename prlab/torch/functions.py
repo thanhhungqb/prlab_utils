@@ -1,7 +1,7 @@
 import torch
 
 
-def make_str_from_st(st, is_inverse=False):
+def make_theta_from_st(st, is_inverse=False):
     """
     ST without rotate
     note: batch mode [-1, 4] to [-1, 2, 3]
