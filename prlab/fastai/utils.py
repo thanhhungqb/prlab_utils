@@ -252,6 +252,10 @@ def prob_acc(target, y, **kwargs):
     return accuracy(target, torch.argmax(y, dim=1))
 
 
+def joint_acc(preds, target, **kwargs):
+    return accuracy(preds[0], target)
+
+
 def make_one_hot(labels, C=2):
     """
     credit: https://gist.github.com/jacobkimmel/4ccdc682a45662e514997f724297f39f
