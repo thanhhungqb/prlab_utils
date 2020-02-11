@@ -1,4 +1,5 @@
 from builtins import super, Exception
+from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -7,9 +8,9 @@ import numpy as np
 import torch
 from fastai import callbacks
 from fastai.basic_data import DatasetType
-from fastai.callbacks import SaveModelCallback, partial, CSVLogger, Learner, Tensor, MetricsList, Callback
-from fastai.metrics import top_k_accuracy, accuracy
-from fastai.train import ClassificationInterpretation
+from fastai.callbacks import SaveModelCallback, CSVLogger
+from fastai.metrics import top_k_accuracy, accuracy, MetricsList
+from fastai.train import ClassificationInterpretation, Learner, Callback, Tensor
 from fastai.vision import imagenet_stats
 from torch.autograd import Variable
 from torch.nn.functional import log_softmax
@@ -151,7 +152,7 @@ class ECSVLogger(CSVLogger):
     def __init__(self, learn: Learner, filename: str = 'history', append: bool = False):
         super(ECSVLogger, self).__init__(learn, filename, append)
 
-    def on_epoch_end(self, epoch: int, smooth_loss: Tensor, last_metrics: MetricsList, **kwargs: Any) -> bool:
+    def on_epoch_end(self, epoch: int, smooth_loss: torch.Tensor, last_metrics: MetricsList, **kwargs: Any) -> bool:
         super().on_epoch_end(epoch, smooth_loss, last_metrics, **kwargs)
         self.file.flush()  # to make sure write to disk
 
@@ -249,6 +250,10 @@ def prob_acc(target, y, **kwargs):
     :return: accuracy
     """
     return accuracy(target, torch.argmax(y, dim=1))
+
+
+def joint_acc(preds, target, **kwargs):
+    return accuracy(preds[0], target)
 
 
 def make_one_hot(labels, C=2):
