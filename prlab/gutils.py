@@ -221,6 +221,8 @@ def parse_extra_args_click(ctx, is_digit_convert=True):
             out[key] = int(val)
         elif val.replace('.', '', 1).isdigit():
             out[key] = float(val)
+        elif val.upper() in ['TRUE', 'FALSE']:
+            out[key] = bool(val)
 
     return out
 
