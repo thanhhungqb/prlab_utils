@@ -1,3 +1,5 @@
+import copy
+import datetime
 import importlib
 import json
 import time
@@ -188,6 +190,39 @@ def save_config_info(config, save_path='.'):
 
     with open("{}/train_config.json".format(save_path), "w") as fw:
         json.dump(config_copy, fw, indent=2, sort_keys=True)
+
+
+def parse_extra_args_click(ctx, is_digit_convert=True):
+    """
+    Parse extra args from `Click` option.
+    Do some default cast before return: number, ?, str (default)
+    note key must be in long form (--key), DO NOT support sort key
+
+    Usage:
+    @click.command(name='command_run_1', context_settings=dict(
+        ignore_unknown_options=True,
+        allow_extra_args=True,
+    ))
+    @click.option('-r', '--run', default='run-00', help='run id')
+    @click.pass_context
+    def command_run(ctx, run):
+        extra_dict = parse_extra_args_click(ctx)
+        ...
+
+    :param ctx: ctx from click command
+    :param is_digit_convert: convert to number
+    :return: dict of {name:value}
+    """
+    out = {ctx.args[i][2:]: ctx.args[i + 1] for i in range(0, len(ctx.args), 2)}
+    for key in out.keys():
+        val = out[key]
+
+        if val.isdigit():
+            out[key] = int(val)
+        elif val.replace('.', '', 1).isdigit():
+            out[key] = float(val)
+
+    return out
 
 
 def test_make_check_point_folder():
