@@ -214,6 +214,8 @@ def parse_extra_args_click(ctx, is_digit_convert=True):
     :return: dict of {name:value}
     """
     out = {ctx.args[i][2:]: ctx.args[i + 1] for i in range(0, len(ctx.args), 2)}
+    is_true_fn = lambda bstr: bstr.lower() in ['true']
+
     for key in out.keys():
         val = out[key]
 
@@ -222,7 +224,7 @@ def parse_extra_args_click(ctx, is_digit_convert=True):
         elif val.replace('.', '', 1).isdigit():
             out[key] = float(val)
         elif val.upper() in ['TRUE', 'FALSE']:
-            out[key] = bool(val)
+            out[key] = is_true_fn(val)
 
     return out
 
