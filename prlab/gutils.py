@@ -5,6 +5,7 @@ import json
 import time
 from pathlib import Path
 
+import click
 import numpy as np
 import pandas as pd
 import sklearn
@@ -227,6 +228,40 @@ def parse_extra_args_click(ctx, is_digit_convert=True):
             out[key] = is_true_fn(val)
 
     return out
+
+
+@click.command(name='command_run', context_settings=dict(
+    ignore_unknown_options=True,
+    allow_extra_args=True,
+))
+@click.option('--run_id', default='run-00', help='run id')
+@click.option('--call', help='Callable (function/class) may be include full path')
+@click.option('--json_conf', default=None, help='json configure file')
+@click.pass_context
+def command_run(ctx, run_id, call, json_conf):
+    """
+    config to run command with callable. All param will pass to callable when call
+    :param ctx:
+    :param run_id:
+    :param call: a callable
+    :param json_conf: load base configure from json file
+    :return:
+    """
+    print('run ID', run_id)
+
+    config = {}
+    if json_conf:
+        with open(json_conf) as fp:
+            config = json.load(fp=fp)
+
+    extra_args = parse_extra_args_click(ctx)
+    config.update(**extra_args)
+
+    # load function by str
+    fn, mod_ = load_func_by_name(call)
+    out = fn(**config)
+
+    print(out)
 
 
 def test_make_check_point_folder():
