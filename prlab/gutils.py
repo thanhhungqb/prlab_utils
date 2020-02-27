@@ -264,6 +264,54 @@ def command_run(ctx, run_id, call, json_conf):
     print(out)
 
 
+@click.command(name='run_k_fold', context_settings=dict(
+    ignore_unknown_options=True,
+    allow_extra_args=True,
+))
+@click.option('--run_id', default='run-00', help='run id')
+@click.option('--k', default=5, help='number of fold, default is 5')
+@click.option('--call', help='Callable (function/class) may be include full path')
+@click.option('--json_conf', default=None, help='json configure file')
+@click.pass_context
+def run_k_fold(ctx, run_id, k, call, json_conf):
+    """
+    config to run command with callable. All param will pass to callable when call.
+    For complex configure, it should be in JSON file for easy to load and reuse.
+    :param ctx:
+    :param run_id:
+    :param k: number of fold
+    :param call: a callable, must support params fold=value and return final value
+    :param json_conf: load base configure from json file
+    :return:
+    """
+    print('run ID', run_id)
+    print('run {} folds'.format(k))
+
+    config = {}
+    if json_conf:
+        with open(json_conf) as fp:
+            config = json.load(fp=fp)
+
+    extra_args = parse_extra_args_click(ctx)
+    config.update(**extra_args)
+
+    print('final configure', config)
+    # load function by str
+    fn, mod_ = load_func_by_name(call)
+
+    out = []
+    for fold in range(0, k):
+        out.append(fn(fold=fold, **config))
+
+    print(out)
+    try:
+        print('simple statistical', np.mean(out), np.std(out))
+    except:
+        pass
+
+    return out
+
+
 def test_make_check_point_folder():
     print(make_check_point_folder("/tmp"))
 
