@@ -28,6 +28,33 @@ def set_if(d, k, v, check=None):
     return d
 
 
+def constant_map_dict(dic, cons=None, excluded=None):
+    """
+    To mapping contants values and reused in JSON file (SELF CONSTANTS MAP).
+    map for dict, and array and keep all others types
+    :param dic: with format {constants:{}, ...} else cons must be provided, or list
+    :param cons: if None then dic must be dic with constants
+    :param excluded: list or set of key OMIT
+    :return: new dic with replace constants
+    """
+    if cons is None:
+        assert isinstance(dic, dict)
+        cons = dic['constants']
+    excluded = [] if excluded is None else excluded
+    excluded = [excluded] if isinstance(excluded, str) else excluded
+    excluded = set(excluded) if not isinstance(excluded, set) else excluded
+
+    if isinstance(dic, dict):
+        ret = {k: constant_map_dict(v, cons=cons, excluded=excluded) for k, v in dic.items()}
+    elif isinstance(dic, list):
+        ret = [constant_map_dict(k, cons=cons, excluded=excluded) for k in dic]
+    else:
+        # do nothing
+        ret = cons.get(dic, dic) if isinstance(dic, str) and dic not in excluded else dic
+
+    return ret
+
+
 def to_json_writeable(js):
     """
     Convert js in JSON to JSON writeable to file, means only str, number, list
