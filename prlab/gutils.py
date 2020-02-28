@@ -15,6 +15,19 @@ from sklearn import preprocessing
 Path.ls = lambda x: list(x.iterdir())
 
 
+def set_if(d, k, v, check=None):
+    """
+    Set value of k to v if check in dict d, check mostly None
+    :param d: dict
+    :param k: key
+    :param v: value
+    :param check: value to check, default is None (mean fill if None)
+    :return:
+    """
+    d[k] = v if d.get(k, check) == check else d[k]
+    return d
+
+
 def to_json_writeable(js):
     """
     Convert js in JSON to JSON writeable to file, means only str, number, list
@@ -294,6 +307,7 @@ def run_k_fold(ctx, run_id, k, call, json_conf):
 
     extra_args = parse_extra_args_click(ctx)
     config.update(**extra_args)
+    config['run_id'] = run_id
 
     print('final configure', config)
     # load function by str
