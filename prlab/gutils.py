@@ -312,8 +312,10 @@ def command_run(ctx, run_id, call, json_conf):
 @click.option('--k', default=5, help='number of fold, default is 5')
 @click.option('--call', help='Callable (function/class) may be include full path')
 @click.option('--json_conf', default=None, help='json configure file')
+@click.option('--json_conf2', default=None,
+              help='additional json configure file, use when use base on json_conf but have small update')
 @click.pass_context
-def run_k_fold(ctx, run_id, k, call, json_conf):
+def run_k_fold(ctx, run_id, k, call, json_conf, json_conf2):
     """
     config to run command with callable. All param will pass to callable when call.
     For complex configure, it should be in JSON file for easy to load and reuse.
@@ -331,6 +333,11 @@ def run_k_fold(ctx, run_id, k, call, json_conf):
     if json_conf:
         with open(json_conf) as fp:
             config = json.load(fp=fp)
+
+    if json_conf2:
+        with open(json_conf2) as fp:
+            config2 = json.load(fp=fp)
+            config.update(**config2)
 
     extra_args = parse_extra_args_click(ctx)
     config.update(**extra_args)
