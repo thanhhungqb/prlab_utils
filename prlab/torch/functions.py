@@ -1,4 +1,6 @@
 import torch
+import torch.nn as nn
+import torch.nn.functional as F
 
 
 def make_theta_from_st(st, is_inverse=False):
@@ -84,6 +86,27 @@ def random_crop_grid(x, grid):
                        torch.FloatTensor(x.size(0)).random_(0, delta) \
                            .unsqueeze(-1).unsqueeze(-1).expand(-1, grid.size(1), grid.size(2)) / x.size(2)
     return grid
+
+
+def fc_more_label(fc, n_label=1):
+    """
+    extend some row (more labels) for fc in pytorch
+    :param fc:
+    :return:
+    """
+    o_label = fc.weight.size()[0]
+    n_label_size = o_label + n_label
+
+    new_fc = nn.Linear(fc.weight.size()[1], n_label_size)
+
+    w = fc.weight  # size label, in_size
+    b = fc.bias  # size label
+
+    # new w and b is (new_label_size, in_size) and (new_label_size)
+    new_fc.weight.data[:, :] = F.pad(w, (0, 0, 0, 1), 'constant', 0)
+    new_fc.bias.data[:] = F.pad(b, (0, 1), "constant", 0)
+
+    return new_fc
 
 # # We want to crop a 80x80 image randomly for our batch
 # # Building central crop of 80 pixel size
