@@ -55,8 +55,8 @@ class SaveModelCallbackTTA(SaveModelCallback):
                 if current is not None and self.operator(current, self.best):
                     print(f'Better model found at epoch {epoch} with {self.monitor} value: {current}.')
                     self.best = current
-                    self.learn.save(f'{self.name}_{epoch}_{current}') if self.is_mul else \
-                        self.learn.save(f'{self.name}')
+                    self.learn.save(f'{self.name}_{epoch}_{current}') if self.is_mul else None
+                    self.learn.save(f'{self.name}')
 
 
 class CheckpointLossVarianceCallback(SaveModelCallback):
