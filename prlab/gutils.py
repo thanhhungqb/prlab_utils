@@ -5,6 +5,7 @@ import json
 import time
 from pathlib import Path
 
+import click
 import numpy as np
 import pandas as pd
 import sklearn
@@ -12,6 +13,46 @@ from sklearn import preprocessing
 
 # add ls function to Path for easy to use
 Path.ls = lambda x: list(x.iterdir())
+
+
+def set_if(d, k, v, check=None):
+    """
+    Set value of k to v if check in dict d, check mostly None
+    :param d: dict
+    :param k: key
+    :param v: value
+    :param check: value to check, default is None (mean fill if None)
+    :return:
+    """
+    d[k] = v if d.get(k, check) == check else d[k]
+    return d
+
+
+def constant_map_dict(dic, cons=None, excluded=None):
+    """
+    To mapping contants values and reused in JSON file (SELF CONSTANTS MAP).
+    map for dict, and array and keep all others types
+    :param dic: with format {constants:{}, ...} else cons must be provided, or list
+    :param cons: if None then dic must be dic with constants
+    :param excluded: list or set of key OMIT
+    :return: new dic with replace constants
+    """
+    if cons is None:
+        assert isinstance(dic, dict)
+        cons = dic['constants']
+    excluded = [] if excluded is None else excluded
+    excluded = [excluded] if isinstance(excluded, str) else excluded
+    excluded = set(excluded) if not isinstance(excluded, set) else excluded
+
+    if isinstance(dic, dict):
+        ret = {k: constant_map_dict(v, cons=cons, excluded=excluded) for k, v in dic.items()}
+    elif isinstance(dic, list):
+        ret = [constant_map_dict(k, cons=cons, excluded=excluded) for k in dic]
+    else:
+        # do nothing
+        ret = cons.get(dic, dic) if isinstance(dic, str) and dic not in excluded else dic
+
+    return ret
 
 
 def to_json_writeable(js):
@@ -225,6 +266,96 @@ def parse_extra_args_click(ctx, is_digit_convert=True):
             out[key] = float(val)
         elif val.upper() in ['TRUE', 'FALSE']:
             out[key] = is_true_fn(val)
+
+    return out
+
+
+@click.command(name='command_run', context_settings=dict(
+    ignore_unknown_options=True,
+    allow_extra_args=True,
+))
+@click.option('--run_id', default='run-00', help='run id')
+@click.option('--call', help='Callable (function/class) may be include full path')
+@click.option('--json_conf', default=None, help='json configure file')
+@click.pass_context
+def command_run(ctx, run_id, call, json_conf):
+    """
+    config to run command with callable. All param will pass to callable when call
+    :param ctx:
+    :param run_id:
+    :param call: a callable
+    :param json_conf: load base configure from json file
+    :return:
+    """
+    print('run ID', run_id)
+
+    config = {}
+    if json_conf:
+        with open(json_conf) as fp:
+            config = json.load(fp=fp)
+
+    extra_args = parse_extra_args_click(ctx)
+    config.update(**extra_args)
+
+    # load function by str
+    fn, mod_ = load_func_by_name(call)
+    out = fn(**config)
+
+    print(out)
+
+
+@click.command(name='run_k_fold', context_settings=dict(
+    ignore_unknown_options=True,
+    allow_extra_args=True,
+))
+@click.option('--run_id', default='run-00', help='run id')
+@click.option('--k', default=5, help='number of fold, default is 5')
+@click.option('--call', help='Callable (function/class) may be include full path')
+@click.option('--json_conf', default=None, help='json configure file')
+@click.option('--json_conf2', default=None,
+              help='additional json configure file, use when use base on json_conf but have small update')
+@click.pass_context
+def run_k_fold(ctx, run_id, k, call, json_conf, json_conf2):
+    """
+    config to run command with callable. All param will pass to callable when call.
+    For complex configure, it should be in JSON file for easy to load and reuse.
+    :param ctx:
+    :param run_id:
+    :param k: number of fold
+    :param call: a callable, must support params fold=value and return final value
+    :param json_conf: load base configure from json file
+    :return:
+    """
+    print('run ID', run_id)
+    print('run {} folds'.format(k))
+
+    config = {}
+    if json_conf:
+        with open(json_conf) as fp:
+            config = json.load(fp=fp)
+
+    if json_conf2:
+        with open(json_conf2) as fp:
+            config2 = json.load(fp=fp)
+            config.update(**config2)
+
+    extra_args = parse_extra_args_click(ctx)
+    config.update(**extra_args)
+    config['run_id'] = run_id
+
+    print('final configure', config)
+    # load function by str
+    fn, mod_ = load_func_by_name(call)
+
+    out = []
+    for fold in range(0, k):
+        out.append(fn(fold=fold, **config))
+
+    print(out)
+    try:
+        print('simple statistical', np.mean(out), np.std(out))
+    except:
+        pass
 
     return out
 
