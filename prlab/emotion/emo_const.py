@@ -3,7 +3,7 @@ This file contains some wide used variable that common in emotion
 """
 
 # FER/FERPLUS labels and id map
-ferlabels = ['neutral', 'happiness', 'surprise', 'sadness', 'anger', 'disgust', 'fear']
+ferlabels = ['neutral', 'happiness', 'surprise', 'sadness', 'anger', 'disgust', 'fear', 'contempt']
 ferlbl2id = {val: pos for pos, val in enumerate(ferlabels)}
 
 emowlabels = ['Neutral', 'Happy', 'Surprise', 'Sad', 'Angry', 'Disgust', 'Fear']
