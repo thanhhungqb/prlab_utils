@@ -28,6 +28,37 @@ def set_if(d, k, v, check=None):
     return d
 
 
+def convert_to_obj(val, **params):
+    """
+    Convert to function call or object
+    :param val: mostly str or list of str
+    :param params: params to call to make obj or function call
+    :return:
+    """
+    if isinstance(val, dict):
+        return {k: convert_to_obj(v, **params) for k, v in val.items()}
+    if isinstance(val, (tuple, list)):
+        return [convert_to_obj(o) for o in val]
+    if isinstance(val, str):
+        return load_func_by_name(val)[0](**params)
+    return val
+
+
+def convert_to_fn(val):
+    """
+    Convert to function (not call, just fn) while `convert_to_obj` do the call
+    :param val: mostly str or list of str
+    :return:
+    """
+    if isinstance(val, dict):
+        return {k: convert_to_fn(v) for k, v in val.items()}
+    if isinstance(val, (tuple, list)):
+        return [convert_to_fn(o) for o in val]
+    if isinstance(val, str):
+        return load_func_by_name(val)[0]
+    return val
+
+
 def constant_map_dict(dic, cons=None, excluded=None):
     """
     To mapping contants values and reused in JSON file (SELF CONSTANTS MAP).
