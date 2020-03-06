@@ -91,7 +91,8 @@ def make_check_point_folder(config={}, cp_base=None, cp_name=None):
     cp_path = path / cp_base if cp_base is not None else path
     cp_path = cp_path / cp_name
     best_name = "best"
-    csvLog = cp_path / "loger"
+    csv_log = cp_path / "loger"
+    config.update({'cp': cp_path, 'best_name': best_name, 'csv_log': csv_log})
 
     # write configure to easy track later, could not write JSON because some object inside config
     cp_path.mkdir(parents=True, exist_ok=True)
@@ -103,7 +104,7 @@ def make_check_point_folder(config={}, cp_base=None, cp_name=None):
     except Exception as e:
         print('warning: ', e)
 
-    return cp_path, best_name, csvLog
+    return cp_path, best_name, csv_log
 
 
 def map_str_prob(str_prob):
