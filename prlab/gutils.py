@@ -44,7 +44,7 @@ def convert_to_obj(val, **params):
     return val
 
 
-def convert_to_fn(val):
+def convert_to_fn(val, **kwargs):
     """
     Convert to function (not call, just fn) while `convert_to_obj` do the call
     :param val: mostly str or list of str
