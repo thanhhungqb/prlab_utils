@@ -11,11 +11,12 @@ from fastai.basic_data import DatasetType
 from fastai.callbacks import SaveModelCallback, CSVLogger
 from fastai.metrics import top_k_accuracy, accuracy, MetricsList
 from fastai.train import ClassificationInterpretation, Learner, Callback, Tensor
-from fastai.vision import imagenet_stats
+from fastai.vision import imagenet_stats, get_transforms
 from torch.autograd import Variable
 from torch.nn.functional import log_softmax
 
 from outside.scikit.plot_confusion_matrix import plot_confusion_matrix
+from prlab.gutils import convert_to_obj, convert_to_fn, make_check_point_folder
 
 
 def freeze_layer(x, flag=True):
@@ -391,6 +392,42 @@ def run_learner_report(learn, data=None, data_test=None, class_names=None, ret_o
     ys1 = torch.argmax(ys, dim=1)
     o = plot_confusion_matrix(y, ys1, classes=class_names, normalize=True)
     return o if ret_only_fig else (valid_acc1, valid_acc, test_acc1, test_acc, o)
+
+
+def general_configure(**kwargs):
+    """
+    Widely used for basic configure for fastai train/test
+    :param kwargs:
+    :return:
+    """
+    # this configure just same minimal key need, must update from kwargs
+    config = {
+        'path': '/ws/data/ferplus-named',
+        'model_path': '/ws/models/ferplus',
+        'csv_path': '/ws/data/ferplus-named/ferplus-meta.csv',
+        'data_helper': 'prlab.emotion.ferplus.data_helper.FerplusDataHelper',
+        'metrics': ['prlab.fastai.utils.prob_acc'],
+        'max_rotate': 30.,
+        'max_zoom': 1.2,
+    }
+    config.update(**kwargs)
+
+    config['path'] = Path(config['path'])
+    config['model_path'] = Path(config['model_path'])
+
+    config.update({
+        'data_helper': convert_to_obj(config['data_helper'], **config),
+        'metrics': convert_to_fn(config['metrics'], **config),
+        'tfms': get_transforms(max_rotate=config['max_rotate'], max_zoom=config['max_zoom'], xtra_tfms=[]),
+    })
+
+    cp, best_name, csv_log = make_check_point_folder(config, None, config['run'])
+    config.update({
+        'callback_fn': lambda: get_callbacks(best_name=best_name, csv_filename=csv_log, monitor='prob_acc'),
+    })
+    print(cp)
+
+    return config
 
 
 top2_acc = partial(top_k_accuracy, k=2)
