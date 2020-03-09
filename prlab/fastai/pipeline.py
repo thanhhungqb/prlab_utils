@@ -142,7 +142,71 @@ def data_load_folder_df(**config):
     return None, config
 
 
-# *************** DATA **********************************
+# *************** TRAINING PROCESS **********************************
+def training_adam_sgd(learn, **config):
+    """
+    A training process than use both adam and sgd, adam for first epochs and later is sgd.
+    This process seems quicker to sgd at the begin, but also meet the best result.
+    Note, for this process, `best` model could not be load correctly, then resume should be careful and addition work to
+    load weights only.
+    Note: at the beginning, `learn` mostly configure with ADAM
+    :param learn:
+    :param config:
+    :return:
+    """
+    best_name = config.get('best_name', 'best')
+    data_train, model, layer_groups = config['data_train'], config['model'], config['layer_groups']
+
+    # TODO see note in header
+    # resume
+    if (config['cp'] / 'final.w').is_file():
+        print('resume from weights')
+        try:
+            learn.model.load_state_dict(torch.load(config['cp'] / 'final.w'), strict=False)
+        except Exception as e:
+            print(e)
+
+    if (config['cp'] / f'{best_name}.pth').is_file():
+        print('resume from checkpoint')
+        try:
+            learn.load(best_name)
+        except Exception as e:
+            print(e)
+
+    learn.save(best_name)  # TODO why need in the newer version of pytorch
+
+    learn.data = data_train
+
+    lr = config.get('lr', 5e-3)
+    learn.fit_one_cycle(config.get('epochs', 30), max_lr=lr)
+
+    learn.save('best-{}'.format(config.get('epochs', 30)))
+
+    torch.save(learn.model.state_dict(), config['cp'] / 'e_{}.w'.format(config.get('epochs', 30)))
+    torch.save(learn.model.state_dict(), config['cp'] / 'final.w')
+
+    # SGD optimize
+    opt = partial(optim.SGD, momentum=0.9)
+    learn = Learner(data_train, model=model, opt_func=opt, metrics=config['metrics'],
+                    layer_groups=layer_groups,
+                    model_dir=config['cp'])
+    learn.model.load_state_dict(torch.load(config['cp'] / 'e_{}.w'.format(config.get('epochs', 30))))
+
+    if config.get('loss_func', None) is not None:
+        learn.loss_func = config['loss_func']
+    if config.get('callback_fn', None) is not None:
+        learn.callback_fns = learn.callback_fns[:1] + config['callback_fn']()
+    learn.data = data_train
+
+    lr = config.get('lr_2', 1e-4)
+    learn.fit_one_cycle(config.get('epochs_2', 30), max_lr=lr)
+
+    torch.save(learn.model.state_dict(), config['cp'] / 'final.w')
+
+    return learn, config
+
+
+# *************** REPORT **********************************
 def make_report_cls(learn, **config):
     """
     Newer, simpler version of `prlab.emotion.ferplus.sr_stn_vgg_8classes.run_report`,
