@@ -13,8 +13,11 @@ Note:
     - see `config/general.json` to basic configure for pipeline
 """
 
+import nltk
+import sklearn
 from fastai.vision import *
 
+from outside.scikit.plot_confusion_matrix import plot_confusion_matrix
 from prlab.fastai.utils import general_configure
 from prlab.gutils import load_func_by_name
 
@@ -43,6 +46,7 @@ def pipeline_control(**kwargs):
     return learn, config
 
 
+# ************* model *************************************
 def model_build(**config):
     """
     Follow Pipeline Process template.
@@ -59,6 +63,7 @@ def model_build(**config):
     return learn, config
 
 
+# *************** DATA **********************************
 def data_load_folder(**config):
     """
     Follow Pipeline Process template.
@@ -100,3 +105,53 @@ def data_load_folder_df(**config):
     """
 
     return None, config
+
+
+# *************** DATA **********************************
+def make_report_cls(learn, **config):
+    """
+    Newer, simpler version of `prlab.emotion.ferplus.sr_stn_vgg_8classes.run_report`,
+    better support `Pipeline Process template`
+    This is for CLASSIFICATION, report on accs and f1 score.
+    y labels could be one-hot or prob mode.
+    Run TTA 3 times and make report to screen, reports.txt and results.npy
+    :param learn:
+    :param config: contains data_test store test in valid mode, tta_times (if have)
+    :return: as description of `Pipeline Process template` including learn and config (not update in this func)
+    """
+    print('starting report')
+    cp = config['cp']
+
+    data_current = learn.data  # make backup of current data of learn
+    learn.data = config['data_test']
+    print(config['data_test'])
+
+    accs, to_save = [], {}
+    for run_num in range(config.get('tta_times', 3)):
+        ys, y = learn.TTA(ds_type=DatasetType.Valid, scale=config.get('test_scale', 1.10))
+
+        ys_npy, y_npy = ys.numpy(), y.numpy()
+        ys_labels = np.argmax(ys_npy, axis=-1)
+        #  support both one-hot and prob mode
+        y_labels = y_npy if isinstance(y_npy.flat[0], (np.int64, np.int)) else np.argmax(y_npy, axis=-1)
+
+        accs.append(nltk.accuracy(ys_labels, y_labels))
+        f1 = sklearn.metrics.f1_score(y_labels, ys_labels, average='macro')  # micro macro
+        to_save['time_{}'.format(run_num)] = {'ys': ys_npy, 'y': y_npy, 'acc': accs[-1], 'f1': f1}
+        print('run', run_num, accs[-1], 'f1', f1)
+
+        _, fig = plot_confusion_matrix(y_labels, ys_labels,
+                                       classes=config.get('label_names', None),
+                                       normalize=config.get('normalize_cm', True),
+                                       title='Confusion matrix')
+        fig.savefig(cp / 'run-{}.png'.format(run_num))
+
+    stats = [np.average(accs), np.std(accs), np.max(accs), np.median(accs)]
+    (config['model_path'] / "reports.txt").open('a').write('{}\t{}\tstats: {}\tf1: {}\n'.format(cp, accs, stats, f1))
+    print('3 results', accs, 'stats', stats)
+
+    np.save(cp / "results", to_save)
+
+    # roll back for data in learn
+    learn.data = data_current
+    return learn, config
