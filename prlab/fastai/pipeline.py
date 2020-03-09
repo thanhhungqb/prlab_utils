@@ -19,6 +19,7 @@ from fastai.vision import *
 
 from outside.scikit.plot_confusion_matrix import plot_confusion_matrix
 from outside.stn import STN
+from outside.super_resolution.srnet import SRNet3
 from prlab.fastai.utils import general_configure
 from prlab.gutils import load_func_by_name
 
@@ -86,6 +87,42 @@ def stn_based(**config):
         create_cnn_model(base_arch, nc=config['n_classes'])
     )
     layer_groups = [model[0], model[1]]
+
+    learn = Learner(config['data_train'], model=model, metrics=config['metrics'], layer_groups=layer_groups,
+                    model_dir=cp)
+
+    if config.get('loss_func', None) is not None:
+        learn.loss_func = config['loss_func']
+    if config.get('callback_fn', None) is not None:
+        learn.callback_fns = learn.callback_fns[:1] + config['callback_fn']()
+
+    return learn, layer_groups
+
+
+def sr_xn_stn(**config):
+    """
+    model_func need return at least learn and layer_groups
+    Note:
+        - load state_dict for model[0] (SRNet3) may be need, use `prlab.fastai.pipeline.srnet3_weights_load`
+    :param config:
+    :return:
+    """
+    cp = config['cp']
+    xn = config.get('xn', 2)
+
+    base_arch = config.get('base_arch', 'vgg16_bn')
+    base_arch = models.resnet152 if base_arch in ['resnet152'] \
+        else models.resnet101 if base_arch in ['resnet101'] \
+        else models.resnet50 if base_arch in ['resnet50'] \
+        else models.vgg16_bn if base_arch in ['vgg16', 'vgg16_bn'] or base_arch is None \
+        else base_arch  # custom TODO not need create base_model in below line
+
+    model = nn.Sequential(
+        SRNet3(xn),
+        STN(img_size=config['img_size'] * xn),
+        create_cnn_model(base_arch, nc=config['n_classes'])
+    )
+    layer_groups = [model[0], model[1], model[2]]
 
     learn = Learner(config['data_train'], model=model, metrics=config['metrics'], layer_groups=layer_groups,
                     model_dir=cp)
@@ -253,4 +290,28 @@ def make_report_cls(learn, **config):
 
     # roll back for data in learn
     learn.data = data_current
+    return learn, config
+
+
+# *************** WEIGHTS LOAD **********************************
+def srnet3_weights_load(learn, **config):
+    """
+    Use together with `prlab.fastai.pipeline.sr_xn_stn` to load pre-trained weights for
+    `outside.super_resolution.srnet.SRNet3`
+    Note: should call after model build.
+    Follow Pipeline Process template.
+    :param learn:
+    :param config:
+    :return:
+    """
+    xn = config.get('xn', 2)
+    xn_weights_path = '/ws/models/super_resolution/facial_x{}.pth'.format(xn)
+    xn_weights_path = xn_weights_path if config.get('xn_weights_path', None) is None else config['xn_weights_path']
+    learn.model[0].load_state_dict(torch.load(xn_weights_path))
+
+    return learn, config
+
+
+def load_weights(learn, **config):
+    learn.model.load_state_dict(torch.load(config['cp'] / 'final.w'))
     return learn, config
