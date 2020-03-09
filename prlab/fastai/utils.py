@@ -415,9 +415,11 @@ def general_configure(**kwargs):
     config['path'] = Path(config['path'])
     config['model_path'] = Path(config['model_path'])
 
+    loss_func = config.get('loss_func', None)
     config.update({
         'data_helper': convert_to_obj(config['data_helper'], **config),
         'metrics': convert_to_fn(config['metrics'], **config),
+        'loss_func': convert_to_fn(loss_func, **config) if isinstance(loss_func, str) else None,
         'tfms': get_transforms(max_rotate=config['max_rotate'], max_zoom=config['max_zoom'], xtra_tfms=[]),
     })
 
