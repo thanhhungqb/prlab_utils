@@ -265,6 +265,29 @@ def training_adam_sgd(learn, **config):
     return learn, config
 
 
+def training_freeze(**config):
+    """
+    training with some diff
+    :param config:
+    :return:
+    """
+    learn = config['learn']
+    learn.data = config['data_train']
+    learn.save(config.get('best_name', 'best'))  # TODO why need in the newer version of pytorch
+
+    lr = config.get('lr', 5e-3)
+    learn.freeze_to(config.get('freeze_to', -1))
+    learn.fit_one_cycle(config.get('epochs', 30), max_lr=lr)
+
+    learn.unfreeze()
+    lr_2 = config.get('lr_2', lr)
+    learn.fit_one_cycle(config.get('epochs_2', 30), max_lr=lr_2)
+
+    torch.save(learn.model.state_dict(), config['cp'] / 'final.w')
+
+    return learn, config
+
+
 # *************** REPORT **********************************
 def make_report_cls(learn, **config):
     """
