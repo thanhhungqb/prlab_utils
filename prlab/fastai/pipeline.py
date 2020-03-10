@@ -283,8 +283,12 @@ def make_report_cls(learn, **config):
         fig.savefig(cp / 'run-{}.png'.format(run_num))
 
     stats = [np.average(accs), np.std(accs), np.max(accs), np.median(accs)]
-    (config['model_path'] / "reports.txt").open('a').write('{}\t{}\tstats: {}\tf1: {}\n'.format(cp, accs, stats, f1))
-    print('3 results', accs, 'stats', stats)
+
+    accs_str = ['{0:.4f}'.format(o) for o in accs]
+    stats_str = ['{0:.4f}'.format(o) for o in stats]
+    (config['model_path'] / "reports.txt").open('a').write(
+        '{}\t{}\tstats: {}\tf1: {}\n'.format(cp, accs_str, stats_str, f1))
+    print('3 results', accs_str, 'stats', stats_str)
 
     np.save(cp / "results", to_save)
 
