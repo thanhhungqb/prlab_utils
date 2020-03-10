@@ -11,7 +11,7 @@ from fastai.basic_data import DatasetType
 from fastai.callbacks import SaveModelCallback, CSVLogger
 from fastai.metrics import top_k_accuracy, accuracy, MetricsList
 from fastai.train import ClassificationInterpretation, Learner, Callback, Tensor
-from fastai.vision import imagenet_stats, get_transforms
+from fastai.vision import imagenet_stats, get_transforms, models
 from torch.autograd import Variable
 from torch.nn.functional import log_softmax
 
@@ -430,6 +430,15 @@ def general_configure(**kwargs):
     print(cp)
 
     return config
+
+
+def base_arch_str_to_obj(base_arch):
+    base_arch = models.resnet152 if base_arch in ['resnet152'] \
+        else models.resnet101 if base_arch in ['resnet101'] \
+        else models.resnet50 if base_arch in ['resnet50'] \
+        else models.vgg16_bn if base_arch in ['vgg16', 'vgg16_bn'] or base_arch is None \
+        else base_arch  # custom TODO not need create base_model in below line
+    return base_arch
 
 
 top2_acc = partial(top_k_accuracy, k=2)
