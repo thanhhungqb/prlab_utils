@@ -86,6 +86,19 @@ def learn_general_setup(**config):
     return learn, config
 
 
+# ************* model func *******************
+def basic_model_build(**config):
+    """
+    Build basic model: vgg, resnet, ...
+    Follow Pipeline Process template.
+    :param config:
+    :return:
+    """
+    base_arch = base_arch_str_to_obj(config.get('base_arch', 'vgg16_bn'))
+    learn = cnn_learner(data=config['data_train'], base_arch=base_arch, model_dir=config['cp'])
+    return learn, learn.layer_groups
+
+
 def stn_based(**config):
     """
     model_func need return at least learn, model and layer_groups
