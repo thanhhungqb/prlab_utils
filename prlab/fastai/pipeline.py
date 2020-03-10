@@ -327,10 +327,10 @@ def make_report_cls(learn, **config):
 
     stats = [np.average(accs), np.std(accs), np.max(accs), np.median(accs)]
 
-    accs_str = ['{0:.4f}'.format(o) for o in accs]
-    stats_str = ['{0:.4f}'.format(o) for o in stats]
+    accs_str = ' '.join(['{0:.4f}'.format(o) for o in accs])
+    stats_str = ' '.join(['{0:.4f}'.format(o) for o in stats])
     (config['model_path'] / "reports.txt").open('a').write(
-        '{}\t{}\tstats: {}\tf1: {}\n'.format(cp, accs_str, stats_str, f1))
+        '{}\t{}\tstats: {}\tf1: {0:.4f}\n'.format(cp, accs_str, stats_str, f1))
     print('3 results', accs_str, 'stats', stats_str)
 
     np.save(cp / "results", to_save)
