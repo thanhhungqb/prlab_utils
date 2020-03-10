@@ -37,9 +37,6 @@ def pipeline_control(**kwargs):
     config = general_configure(**config)
     learn = None
 
-    # load data func here, both train and test in data_train, data_test
-    _, config, *_ = load_func_by_name(config['data_train'])[0](learn=learn, **config)
-
     process_pipeline = [load_func_by_name(o)[0] if isinstance(o, str) else o for o in config['process_pipeline']]
     for fn in process_pipeline:
         learn, config, *_ = fn(**config)
@@ -361,3 +358,16 @@ def srnet3_weights_load(learn, **config):
 def load_weights(learn, **config):
     learn.model.load_state_dict(torch.load(config['cp'] / 'final.w'))
     return learn, config
+
+
+# *************** OTHERS **********************************
+def cpu_ws(**config):
+    """
+    To set train/test on cpu working space.
+    If use, must be before all data-loader, model build, etc. in the pipeline
+    Follow Pipeline Process template.
+    :param config:
+    :return:
+    """
+    defaults.device = torch.device('cpu')
+    return None, config
