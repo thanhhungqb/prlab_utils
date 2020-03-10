@@ -12,7 +12,7 @@ Note:
     (TODO keep data for older version use, but remove in future)
     - see `config/general.json` to basic configure for pipeline
 """
-
+import deprecation
 import nltk
 import sklearn
 from fastai.vision import *
@@ -396,6 +396,7 @@ def resume_learner(learn, **config):
 
 
 # *************** OTHERS **********************************
+@deprecation.deprecated(details='replace by device_setup function')
 def cpu_ws(**config):
     """
     To set train/test on cpu working space.
@@ -405,4 +406,16 @@ def cpu_ws(**config):
     :return:
     """
     defaults.device = torch.device('cpu')
+    return None, config
+
+
+def device_setup(**config):
+    """
+    To set train/test on cpu working space.
+    If use, must be before all data-loader, model build, etc. in the pipeline
+    Follow Pipeline Process template.
+    :param config:
+    :return:
+    """
+    defaults.device = torch.device(config.get('device', 'cpu'))
     return None, config
