@@ -220,7 +220,7 @@ def data_load_folder_df(**config):
 # *************** TRAINING PROCESS **********************************
 def training_adam_sgd(learn, **config):
     """
-    A training process than use both adam and sgd, adam for first epochs and later is sgd.
+    A training process that use both adam and sgd, adam for first epochs and later is sgd.
     This process seems quicker to sgd at the begin, but also meet the best result.
     Note, for this process, `best` model could not be load correctly, then resume should be careful and addition work to
     load weights only.
@@ -234,19 +234,6 @@ def training_adam_sgd(learn, **config):
 
     # TODO see note in header
     # resume
-    if (config['cp'] / 'final.w').is_file():
-        print('resume from weights')
-        try:
-            learn.model.load_state_dict(torch.load(config['cp'] / 'final.w'), strict=False)
-        except Exception as e:
-            print(e)
-
-    if (config['cp'] / f'{best_name}.pth').is_file():
-        print('resume from checkpoint')
-        try:
-            learn.load(best_name)
-        except Exception as e:
-            print(e)
 
     learn.save(best_name)  # TODO why need in the newer version of pytorch
 
@@ -267,10 +254,7 @@ def training_adam_sgd(learn, **config):
                     model_dir=config['cp'])
     learn.model.load_state_dict(torch.load(config['cp'] / 'e_{}.w'.format(config.get('epochs', 30))))
 
-    if config.get('loss_func', None) is not None:
-        learn.loss_func = config['loss_func']
-    if config.get('callback_fn', None) is not None:
-        learn.callback_fns = learn.callback_fns[:1] + config['callback_fn']()
+    learn, config, *_ = learn_general_setup(learn, **config)
     learn.data = data_train
 
     lr = config.get('lr_2', 1e-4)
@@ -325,7 +309,7 @@ def make_report_cls(learn, **config):
     accs_str = ' '.join(['{0:.4f}'.format(o) for o in accs])
     stats_str = ' '.join(['{0:.4f}'.format(o) for o in stats])
     (config['model_path'] / "reports.txt").open('a').write(
-        '{}\t{}\tstats: {}\tf1: {0:.4f}\n'.format(cp, accs_str, stats_str, f1))
+        '{}\t{}\tstats: {}\tf1: {:.4f}\n'.format(cp, accs_str, stats_str, f1))
     print('3 results', accs_str, 'stats', stats_str)
 
     np.save(cp / "results", to_save)
@@ -357,6 +341,34 @@ def srnet3_weights_load(learn, **config):
 
 def load_weights(learn, **config):
     learn.model.load_state_dict(torch.load(config['cp'] / 'final.w'))
+    return learn, config
+
+
+def resume_learner(learn, **config):
+    """
+    Resume, load weight from final.w or best_name in this order.
+    Note: best_name maybe newer than final.w, then will override if both found
+    :param learn:
+    :param config:
+    :return:
+    """
+    best_name = config.get('best_name', 'best')
+
+    if (config['cp'] / 'final.w').is_file():
+        print('resume from weights')
+        try:
+            learn.model.load_state_dict(torch.load(config['cp'] / config.get('final_w', 'final.w')), strict=False)
+        except Exception as e:
+            print(e)
+
+    if (config['cp'] / f'{best_name}.pth').is_file():
+        print('resume from checkpoint')
+        try:
+            learn.load(best_name)
+        except Exception as e:
+            print(e)
+
+    config['learn'] = learn
     return learn, config
 
 
