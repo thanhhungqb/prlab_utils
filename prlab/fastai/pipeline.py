@@ -20,7 +20,7 @@ from fastai.vision import *
 from outside.scikit.plot_confusion_matrix import plot_confusion_matrix
 from outside.stn import STN
 from outside.super_resolution.srnet import SRNet3
-from prlab.fastai.utils import general_configure
+from prlab.fastai.utils import general_configure, base_arch_str_to_obj
 from prlab.gutils import load_func_by_name
 
 
@@ -61,6 +61,27 @@ def model_build(**config):
     config.update({
         'model': learn.model, 'layer_groups': layer_groups
     })
+
+    return learn, config
+
+
+def learn_general_setup(**config):
+    """
+    Follow Pipeline Process template.
+    :param config: contains learn and all configure
+    :return:
+    """
+    learn = config['learn']
+    if config.get('loss_func', None) is not None:
+        learn.loss_func = config['loss_func']
+    if config.get('callback_fn', None) is not None:
+        learn.callback_fns = learn.callback_fns[:1] + listify(config['callback_fn']())
+
+    if config.get('metrics', None) is not None:
+        learn.metrics = listify(config['metrics'])
+
+    if config.get('layer_groups', None) is not None:
+        learn.layer_groups = config['layer_groups']
 
     return learn, config
 
@@ -110,12 +131,7 @@ def sr_xn_stn(**config):
     cp = config['cp']
     xn = config.get('xn', 2)
 
-    base_arch = config.get('base_arch', 'vgg16_bn')
-    base_arch = models.resnet152 if base_arch in ['resnet152'] \
-        else models.resnet101 if base_arch in ['resnet101'] \
-        else models.resnet50 if base_arch in ['resnet50'] \
-        else models.vgg16_bn if base_arch in ['vgg16', 'vgg16_bn'] or base_arch is None \
-        else base_arch  # custom TODO not need create base_model in below line
+    base_arch = base_arch_str_to_obj(config.get('base_arch', 'vgg16_bn'))
 
     model = nn.Sequential(
         SRNet3(xn),
@@ -131,6 +147,33 @@ def sr_xn_stn(**config):
         learn.loss_func = config['loss_func']
     if config.get('callback_fn', None) is not None:
         learn.callback_fns = learn.callback_fns[:1] + config['callback_fn']()
+
+    return learn, layer_groups
+
+
+def stn_sr_xn(**config):
+    """
+    Similar with `prlab.fastai.pipeline.sr_xn_stn` but stn before sr.
+    The idea here is while stn could make some noise, sr should correct it in natural way
+    model_func need return at least learn and layer_groups
+    Note:
+        - load state_dict for model[0] (SRNet3) may be need, use `prlab.fastai.pipeline.srnet3_weights_load`
+    :param config:
+    :return:
+    """
+    cp = config['cp']
+    xn = config.get('xn', 2)
+
+    base_arch = base_arch_str_to_obj(config.get('base_arch', 'vgg16_bn'))
+
+    model = nn.Sequential(
+        STN(img_size=config['img_size']),
+        SRNet3(xn),
+        create_cnn_model(base_arch, nc=config['n_classes'])
+    )
+    layer_groups = [model[0], model[1], model[2]]
+
+    learn = Learner(config['data_train'], model=model, model_dir=cp)
 
     return learn, layer_groups
 
@@ -311,7 +354,8 @@ def srnet3_weights_load(learn, **config):
     xn = config.get('xn', 2)
     xn_weights_path = '/ws/models/super_resolution/facial_x{}.pth'.format(xn)
     xn_weights_path = xn_weights_path if config.get('xn_weights_path', None) is None else config['xn_weights_path']
-    learn.model[0].load_state_dict(torch.load(xn_weights_path))
+    [learn.model[i].load_state_dict(torch.load(xn_weights_path))
+     for i in range(3) if isinstance(learn.model[i], SRNet3)]
 
     return learn, config
 
