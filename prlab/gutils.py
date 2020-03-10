@@ -225,12 +225,48 @@ def resample_to_distribution(x, y, dis=[]):
     return sklearn.utils.shuffle(np.stack(x_new), np.stack(y_new))
 
 
+def obj_func_str_split(name_str, **kwargs):
+    """
+    Split object class/function name from str represent in three form:
+    - raw name only, DO NOTHING, e.g.
+        pcam.models.simple_transfer_model_xavier
+        prlab.model.srss.SRSSVGGModel
+    - func form (str of function name), CUT, e.g. <function prob_acc at 0x7efb63ec5ea0>
+    - object form (str of object), CUT, e.g.
+        <prlab.emotion.ferplus.data_helper.FerplusDataHelper object at 0x7efb63ed50b8>
+    :param name_str:
+    :param kwargs:
+    :return:
+    """
+    if name_str.startswith('<'):
+        if name_str.endswith('>'):
+            # this form is function/object in memory, then have "at ..." at the end of str
+            name_str = name_str[1:-1]
+            arr = name_str.split()
+            if arr[2] != 'at':
+                raise Exception('Wrong represent string of function, object or class ')
+            if arr[0] == 'function':
+                # form <function fname at ...>
+                return arr[1]
+            elif arr[1] == 'object':
+                # form <obj_name object at ...>
+                return arr[0]
+            else:
+                raise Exception('Wrong represent string of function, object or class ')
+        else:
+            raise Exception('Wrong represent string of function, object or class ')
+    else:
+        # this form raw, function or class name
+        return name_str
+
+
 def load_func_by_name(func_str):
     """
-    Load function by full name, e.g. pcam.models.simple_transfer_model_xavier
+    Load function/object/class by full name, e.g. pcam.models.simple_transfer_model_xavier
     :param func_str: package.name
     :return: fn, module
     """
+    func_str = obj_func_str_split(func_str)
     mod_name, func_name = func_str.rsplit('.', 1)
     mod = importlib.import_module(mod_name)
     func = getattr(mod, func_name)
