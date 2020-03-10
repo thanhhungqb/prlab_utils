@@ -96,12 +96,7 @@ def stn_based(**config):
     :return:
     """
     cp = config['cp']
-    base_arch = config.get('base_arch', 'vgg16_bn')
-    base_arch = models.resnet152 if base_arch in ['resnet152'] \
-        else models.resnet101 if base_arch in ['resnet101'] \
-        else models.resnet50 if base_arch in ['resnet50'] \
-        else models.vgg16_bn if base_arch in ['vgg16', 'vgg16_bn'] or base_arch is None \
-        else base_arch  # custom TODO not need create base_model in below line
+    base_arch = base_arch_str_to_obj(config.get('base_arch', 'vgg16_bn'))
 
     model = nn.Sequential(
         STN(img_size=config['img_size']),
@@ -111,11 +106,6 @@ def stn_based(**config):
 
     learn = Learner(config['data_train'], model=model, metrics=config['metrics'], layer_groups=layer_groups,
                     model_dir=cp)
-
-    if config.get('loss_func', None) is not None:
-        learn.loss_func = config['loss_func']
-    if config.get('callback_fn', None) is not None:
-        learn.callback_fns = learn.callback_fns[:1] + config['callback_fn']()
 
     return learn, layer_groups
 
@@ -142,11 +132,6 @@ def sr_xn_stn(**config):
 
     learn = Learner(config['data_train'], model=model, metrics=config['metrics'], layer_groups=layer_groups,
                     model_dir=cp)
-
-    if config.get('loss_func', None) is not None:
-        learn.loss_func = config['loss_func']
-    if config.get('callback_fn', None) is not None:
-        learn.callback_fns = learn.callback_fns[:1] + config['callback_fn']()
 
     return learn, layer_groups
 
