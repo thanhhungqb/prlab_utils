@@ -130,6 +130,7 @@ def basic_model_build(**config):
     """
     base_arch = base_arch_str_to_obj(config.get('base_arch', 'vgg16_bn'))
     learn = cnn_learner(data=config['data_train'], base_arch=base_arch, model_dir=config['cp'])
+    learn.unfreeze()
     return learn, learn.layer_groups
 
 
