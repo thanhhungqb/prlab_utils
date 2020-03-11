@@ -49,6 +49,39 @@ def pipeline_control(**kwargs):
     return config
 
 
+def pipeline_control_multi(**kwargs):
+    """
+    For general control overall pipeline, support for multi pipeline
+    See `prlab.fastai.pipeline.pipeline_control`
+    What different:
+        - `prlab.fastai.utils.general_configure` add to pipe instead call directly
+        - support many pipeline in order name (max1000): process_pipeline_0, process_pipeline_1, ...
+        Why process_pipeline in the middle? FOR SUPPORT THE OLDER VERSION of configure file
+    :param kwargs: configure
+    :return:
+    """
+    config = {}
+    config.update(**kwargs)
+
+    ordered_pipeline_names = ['process_pipeline_{}'.format(i) for i in range(1000) if
+                              config.get('process_pipeline_{}'.format(i), None) is not None]
+    if len(ordered_pipeline_names) == 0:
+        # support old version of configure file
+        ordered_pipeline_names = ['process_pipeline']
+
+    # this step to make sure all name could be convert to function to call laterr
+    # this is early check
+    for pipe_name in ordered_pipeline_names:
+        [load_func_by_name(o)[0] if isinstance(o, str) else o for o in config[pipe_name]]
+
+    for pipe_name in ordered_pipeline_names:
+        process_pipeline = [load_func_by_name(o)[0] if isinstance(o, str) else o for o in config[pipe_name]]
+        for fn in process_pipeline:
+            config = fn(**config)
+
+    return config
+
+
 # ************* model *************************************
 def model_build(**config):
     """
@@ -332,7 +365,7 @@ def make_report_cls(**config):
     learn.data = config['data_test']
     print(config['data_test'])
 
-    accs, to_save = [], {}
+    accs, f1s, to_save = [], [], {}
     for run_num in range(config.get('tta_times', 3)):
         ys, y = learn.TTA(ds_type=DatasetType.Valid, scale=config.get('test_scale', 1.10))
 
@@ -354,13 +387,15 @@ def make_report_cls(**config):
         cm = confusion_matrix(y_labels, ys_labels)
         cm_n = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
         (config['cp'] / "cm.txt").open('a').write('acc: {:.4f}\tf1: {:.4f}\n{}\n{}\n\n'.format(accs[-1], f1, cm, cm_n))
+        f1s.append(f1)
 
     stats = [np.average(accs), np.std(accs), np.max(accs), np.median(accs)]
 
     accs_str = ' '.join(['{0:.4f}'.format(o) for o in accs])
     stats_str = ' '.join(['{0:.4f}'.format(o) for o in stats])
+    f1s_str = ' '.join(['{:.4f}'.format(o) for o in f1s])
     (config['model_path'] / "reports.txt").open('a').write(
-        '{}\t{}\tstats: {}\tf1: {:.4f}\n'.format(cp, accs_str, stats_str, f1))
+        '{}\t{}\tstats: {}\tf1: {}\n'.format(cp, accs_str, stats_str, f1s_str))
     print('3 results', accs_str, 'stats', stats_str)
 
     np.save(cp / "results", to_save)
