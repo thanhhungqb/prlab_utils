@@ -222,6 +222,25 @@ def data_load_folder_df(**config):
 
 
 # *************** TRAINING PROCESS **********************************
+def training_simple(**config):
+    """
+    very simple training process
+    `Pipeline Process template`
+    :param config:
+    :return:
+    """
+    learn = config['learn']
+    learn.data = config['data_train']
+    learn.save(config.get('best_name', 'best'))
+
+    lr = config.get('lr', 1e-3)
+    learn.fit_one_cycle(config.get('epochs', 30), max_lr=lr)
+
+    torch.save(learn.model.state_dict(), config['cp'] / 'final.w')
+
+    return config
+
+
 def training_adam_sgd(**config):
     """
     A training process that use both adam and sgd, adam for first epochs and later is sgd.
