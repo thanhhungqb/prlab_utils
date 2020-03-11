@@ -31,8 +31,13 @@ def pipeline_control(**kwargs):
     :param kwargs:
     :return:
     """
-    with open('config/general.json') as f:
-        config = json.load(f)
+    config = {}
+    try:
+        with open('config/general.json') as f:
+            config = json.load(f)
+    except Exception as e:
+        print('no general.json', e)
+
     config.update(**kwargs)
     config = general_configure(**config)
     learn = None
@@ -185,7 +190,7 @@ def data_load_folder(**config):
         ImageList.from_folder(config['path'])
             .split_by_folder()
             .label_from_func(config['data_helper'].y_func, label_cls=FloatList)
-            .transform(config['tfms'])
+            .transform(config['tfms'], size=config['img_size'])
             .databunch(bs=config['bs'])
     ).normalize(imagenet_stats)
     config['data_train'], config['data'] = data_train, data_train
@@ -196,7 +201,7 @@ def data_load_folder(**config):
         ImageList.from_folder(config['path'])
             .split_by_folder(valid='test')
             .label_from_func(config['data_helper'].y_func, label_cls=config['data_helper'].label_cls)
-            .transform(config['tfms'])
+            .transform(config['tfms'], size=config['img_size'])
             .databunch(bs=config['bs'])
     ).normalize(imagenet_stats)
     config['data_test'] = data_test
@@ -218,17 +223,17 @@ def data_load_folder_df(**config):
 
 
 # *************** TRAINING PROCESS **********************************
-def training_adam_sgd(learn, **config):
+def training_adam_sgd(**config):
     """
     A training process that use both adam and sgd, adam for first epochs and later is sgd.
     This process seems quicker to sgd at the begin, but also meet the best result.
     Note, for this process, `best` model could not be load correctly, then resume should be careful and addition work to
     load weights only.
     Note: at the beginning, `learn` mostly configure with ADAM
-    :param learn:
     :param config:
     :return:
     """
+    learn = config['learn']
     best_name = config.get('best_name', 'best')
     data_train, model, layer_groups = config['data_train'], config['model'], config['layer_groups']
 
@@ -253,8 +258,9 @@ def training_adam_sgd(learn, **config):
                     layer_groups=layer_groups,
                     model_dir=config['cp'])
     learn.model.load_state_dict(torch.load(config['cp'] / 'e_{}.w'.format(config.get('epochs', 30))))
+    config['learn'] = learn  # new leaner
 
-    learn, config, *_ = learn_general_setup(learn, **config)
+    learn, config, *_ = learn_general_setup(**config)
     learn.data = data_train
 
     lr = config.get('lr_2', 1e-4)
@@ -289,7 +295,7 @@ def training_freeze(**config):
 
 
 # *************** REPORT **********************************
-def make_report_cls(learn, **config):
+def make_report_cls(**config):
     """
     Newer, simpler version of `prlab.emotion.ferplus.sr_stn_vgg_8classes.run_report`,
     better support `Pipeline Process template`
@@ -301,6 +307,7 @@ def make_report_cls(learn, **config):
     :return: as description of `Pipeline Process template` including learn and config (not update in this func)
     """
     print('starting report')
+    learn = config['learn']
     cp = config['cp']
 
     data_current = learn.data  # make backup of current data of learn
@@ -343,38 +350,42 @@ def make_report_cls(learn, **config):
 
 
 # *************** WEIGHTS LOAD **********************************
-def srnet3_weights_load(learn, **config):
+def srnet3_weights_load(**config):
     """
     Use together with `prlab.fastai.pipeline.sr_xn_stn` to load pre-trained weights for
     `outside.super_resolution.srnet.SRNet3`
     Note: should call after model build.
     Follow Pipeline Process template.
-    :param learn:
     :param config:
     :return:
     """
+    learn = config['learn']
     xn = config.get('xn', 2)
     xn_weights_path = '/ws/models/super_resolution/facial_x{}.pth'.format(xn)
     xn_weights_path = xn_weights_path if config.get('xn_weights_path', None) is None else config['xn_weights_path']
-    [learn.model[i].load_state_dict(torch.load(xn_weights_path))
-     for i in range(3) if isinstance(learn.model[i], SRNet3)]
+    for i in range(3):
+        if isinstance(learn.model[i], SRNet3):
+            out = learn.model[i].load_state_dict(torch.load(xn_weights_path))
+            print('load srnet2 out:', xn_weights_path, out)
 
     return learn, config
 
 
-def load_weights(learn, **config):
-    learn.model.load_state_dict(torch.load(config['cp'] / 'final.w'))
+def load_weights(**config):
+    learn = config['learn']
+    out = learn.model.load_state_dict(torch.load(config['cp'] / 'final.w'))
+    print('load weights', out)
     return learn, config
 
 
-def resume_learner(learn, **config):
+def resume_learner(**config):
     """
     Resume, load weight from final.w or best_name in this order.
     Note: best_name maybe newer than final.w, then will override if both found
-    :param learn:
     :param config:
     :return:
     """
+    learn = config['learn']
     best_name = config.get('best_name', 'best')
 
     if (config['cp'] / 'final.w').is_file():
@@ -391,7 +402,25 @@ def resume_learner(learn, **config):
         except Exception as e:
             print(e)
 
-    config['learn'] = learn
+    return learn, config
+
+
+def vgg16_weights_load(**config):
+    """
+    Use together with `prlab.fastai.pipeline.sr_xn_stn` to load pre-trained weights for
+    `outside.super_resolution.srnet.SRNet3`
+    Note: should call after model build.
+    Follow Pipeline Process template.
+    :param config:
+    :return:
+    """
+    learn = config['learn']
+    vgg16_weights_path = '/ws/models/ferplus/vgg16_bn_quick/final.w'
+    vgg16_weights_path = vgg16_weights_path if config.get('xvgg16_weights_path', None) is None else config[
+        'xvgg16_weights_path']
+    out = learn.model[2].load_state_dict(torch.load(vgg16_weights_path), strict=False)
+    print('load vgg16 status', out)
+
     return learn, config
 
 
