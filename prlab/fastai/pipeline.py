@@ -467,5 +467,5 @@ def device_setup(**config):
     :param config:
     :return:
     """
-    defaults.device = torch.device(config.get('device', 'cpu'))
+    defaults.device = torch.device(config.get('device', 'cuda'))
     return config
