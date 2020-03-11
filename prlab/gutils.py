@@ -345,17 +345,15 @@ def parse_extra_args_click(ctx, is_digit_convert=True):
     allow_extra_args=True,
 ))
 @click.option('--run_id', default='run-00', help='run id')
-@click.option('--call', help='Callable (function/class) may be include full path')
 @click.option('--json_conf', default=None, help='json configure file')
 @click.option('--json_conf2', default=None,
               help='additional json configure file, use when use base on json_conf but have small update')
 @click.pass_context
-def command_run(ctx, run_id, call, json_conf, json_conf2):
+def command_run(ctx, run_id, json_conf, json_conf2):
     """
     config to run command with callable. All param will pass to callable when call
     :param ctx:
     :param run_id:
-    :param call: a callable
     :param json_conf: load base configure from json file
     :param json_conf2: additional configure, override the first file
     :return:
@@ -376,7 +374,7 @@ def command_run(ctx, run_id, call, json_conf, json_conf2):
     config.update(**extra_args)
 
     # load function by str
-    fn, mod_ = load_func_by_name(call)
+    fn, mod_ = load_func_by_name(config['call'])
     out = fn(**config)
 
     print(out)
