@@ -6,8 +6,8 @@ The main idea is make a standard pipeline that most of training process share, a
 and dump to file to easy track results later.
 
 Note:
-    - all pipeline process must be return at least 2 variable learn, config (change from old, only learn), input is
-    learn and **config also
+    - all pipeline process must be received config as input and return new config as output
+        form:  def func(**config): return new_config
     - change use of data to data_train for clear meaning (and not confuse with data in fastai), data_test for testing
     (TODO keep data for older version use, but remove in future)
     - see `config/general.json` to basic configure for pipeline
@@ -16,6 +16,7 @@ import deprecation
 import nltk
 import sklearn
 from fastai.vision import *
+from sklearn.metrics import confusion_matrix
 
 from outside.scikit.plot_confusion_matrix import plot_confusion_matrix
 from outside.stn import STN
@@ -40,20 +41,19 @@ def pipeline_control(**kwargs):
 
     config.update(**kwargs)
     config = general_configure(**config)
-    learn = None
 
     process_pipeline = [load_func_by_name(o)[0] if isinstance(o, str) else o for o in config['process_pipeline']]
     for fn in process_pipeline:
-        learn, config, *_ = fn(**config)
-        config['learn'] = learn
+        config = fn(**config)
 
-    return learn, config
+    return config
 
 
 # ************* model *************************************
 def model_build(**config):
     """
     Follow Pipeline Process template.
+    TODO model_func will follow Pipeline Process template too
     :param config:
     :return:
     """
@@ -61,10 +61,10 @@ def model_build(**config):
     learn, layer_groups, *_ = model_func(**config)
     (config['cp'] / "model.txt").open('a').write(str(learn.model))
     config.update({
-        'model': learn.model, 'layer_groups': layer_groups
+        'model': learn.model, 'layer_groups': layer_groups, 'learn': learn
     })
 
-    return learn, config
+    return config
 
 
 def learn_general_setup(**config):
@@ -85,16 +85,15 @@ def learn_general_setup(**config):
     if config.get('layer_groups', None) is not None:
         learn.layer_groups = config['layer_groups']
 
-    return learn, config
+    return config
 
 
 # ************* model func *******************
 def basic_model_build(**config):
     """
     Build basic model: vgg, resnet, ...
-    Follow Pipeline Process template.
     :param config:
-    :return:
+    :return: learn and layer_groups
     """
     base_arch = base_arch_str_to_obj(config.get('base_arch', 'vgg16_bn'))
     learn = cnn_learner(data=config['data_train'], base_arch=base_arch, model_dir=config['cp'])
@@ -207,7 +206,7 @@ def data_load_folder(**config):
     config['data_test'] = data_test
     print('data test', data_test)
 
-    return None, config
+    return config
 
 
 def data_load_folder_df(**config):
@@ -219,7 +218,7 @@ def data_load_folder_df(**config):
     :return: None, new_config (None for learner)
     """
 
-    return None, config
+    return config
 
 
 # *************** TRAINING PROCESS **********************************
@@ -260,7 +259,7 @@ def training_adam_sgd(**config):
     learn.model.load_state_dict(torch.load(config['cp'] / 'e_{}.w'.format(config.get('epochs', 30))))
     config['learn'] = learn  # new leaner
 
-    learn, config, *_ = learn_general_setup(**config)
+    config = learn_general_setup(**config)
     learn.data = data_train
 
     lr = config.get('lr_2', 1e-4)
@@ -268,7 +267,7 @@ def training_adam_sgd(**config):
 
     torch.save(learn.model.state_dict(), config['cp'] / 'final.w')
 
-    return learn, config
+    return config
 
 
 def training_freeze(**config):
@@ -291,7 +290,7 @@ def training_freeze(**config):
 
     torch.save(learn.model.state_dict(), config['cp'] / 'final.w')
 
-    return learn, config
+    return config
 
 
 # *************** REPORT **********************************
@@ -333,6 +332,9 @@ def make_report_cls(**config):
                                        normalize=config.get('normalize_cm', True),
                                        title='Confusion matrix')
         fig.savefig(cp / 'run-{}.png'.format(run_num))
+        cm = confusion_matrix(y_labels, ys_labels)
+        cm_n = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+        (config['cp'] / "cm.txt").open('a').write('acc: {:.4f}\tf1: {:.4f}\n{}\n{}\n\n'.format(accs[-1], f1, cm, cm_n))
 
     stats = [np.average(accs), np.std(accs), np.max(accs), np.median(accs)]
 
@@ -346,7 +348,7 @@ def make_report_cls(**config):
 
     # roll back for data in learn
     learn.data = data_current
-    return learn, config
+    return config
 
 
 # *************** WEIGHTS LOAD **********************************
@@ -368,14 +370,14 @@ def srnet3_weights_load(**config):
             out = learn.model[i].load_state_dict(torch.load(xn_weights_path))
             print('load srnet2 out:', xn_weights_path, out)
 
-    return learn, config
+    return config
 
 
 def load_weights(**config):
     learn = config['learn']
     out = learn.model.load_state_dict(torch.load(config['cp'] / 'final.w'))
     print('load weights', out)
-    return learn, config
+    return config
 
 
 def resume_learner(**config):
@@ -402,7 +404,7 @@ def resume_learner(**config):
         except Exception as e:
             print(e)
 
-    return learn, config
+    return config
 
 
 def vgg16_weights_load(**config):
@@ -421,7 +423,7 @@ def vgg16_weights_load(**config):
     out = learn.model[2].load_state_dict(torch.load(vgg16_weights_path), strict=False)
     print('load vgg16 status', out)
 
-    return learn, config
+    return config
 
 
 # *************** OTHERS **********************************
@@ -435,7 +437,7 @@ def cpu_ws(**config):
     :return:
     """
     defaults.device = torch.device('cpu')
-    return None, config
+    return config
 
 
 def device_setup(**config):
@@ -447,4 +449,4 @@ def device_setup(**config):
     :return:
     """
     defaults.device = torch.device(config.get('device', 'cpu'))
-    return None, config
+    return config
