@@ -3,6 +3,18 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
+class PassThrough(nn.Module):
+    """
+    Do nothing, just passthrough input
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__()
+
+    def forward(self, *input, **kwargs):
+        return input[0]
+
+
 def make_theta_from_st(st, is_inverse=False):
     """
     ST without rotate
