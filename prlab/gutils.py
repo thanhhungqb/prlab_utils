@@ -346,16 +346,13 @@ def parse_extra_args_click(ctx, is_digit_convert=True):
 ))
 @click.option('--run_id', default='run-00', help='run id')
 @click.option('--json_conf', default=None, help='json configure file')
-@click.option('--json_conf2', default=None,
-              help='additional json configure file, use when use base on json_conf but have small update')
 @click.pass_context
-def command_run(ctx, run_id, json_conf, json_conf2):
+def command_run(ctx, run_id, json_conf):
     """
     config to run command with callable. All param will pass to callable when call
     :param ctx:
     :param run_id:
     :param json_conf: load base configure from json file
-    :param json_conf2: additional configure, override the first file
     :return:
     """
     print('run ID', run_id)
@@ -365,13 +362,16 @@ def command_run(ctx, run_id, json_conf, json_conf2):
         with open(json_conf) as fp:
             config = json.load(fp=fp)
 
-    if json_conf2:
-        with open(json_conf2) as fp:
-            config2 = json.load(fp=fp)
-            config.update(**config2)
-
     extra_args = parse_extra_args_click(ctx)
     config.update(**extra_args)
+
+    # all other configure json_conf2, ... will be in config too
+    for idx in range(20):
+        additional_conf = 'json_conf{}'.format(idx)
+        if config.get(additional_conf, None) is not None:
+            with open(config[additional_conf]) as fp:
+                config2 = json.load(fp=fp)
+                config.update(**config2)
 
     # load function by str
     fn, mod_ = load_func_by_name(config['call'])
