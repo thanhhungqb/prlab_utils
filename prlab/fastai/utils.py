@@ -198,16 +198,16 @@ def get_callbacks(best_name='best', monitor='valid_loss', csv_filename='log', cs
     return out
 
 
-def dificult_weight_loss(y_preds, target, *args, **kwargs):
+def dificult_weight_loss(pred, target, *args, **kwargs):
     """
     loss = - 1 * log(pi) * (pj/pi), where pj is max(p_)
-    :param y_preds:
+    :param pred:
     :param target:
     :param args:
     :param kwargs:
     :return:
     """
-    softmax = log_softmax(y_preds, 1)
+    softmax = log_softmax(pred, 1)
     target_one_hot = torch.zeros(len(target.cpu()), 7).scatter_(1, target.cpu().unsqueeze(1), 1.)
 
     xa, _ = torch.max(softmax, dim=1)
@@ -220,19 +220,19 @@ def dificult_weight_loss(y_preds, target, *args, **kwargs):
     return torch.mean(a)
 
 
-def prob_loss_raw(target, y, **kwargs):
+def prob_loss_raw(pred, target, **kwargs):
     """
     This is a custom of SoftMaxCrossEntropy
     Loss when y input as raw probability instead a int number.
     Use when prob not 1/0 but float distribution
-    :param target: raw_scrore (not softmax)
-    :param y: [0.7 0.2 0.1]
+    :param pred: raw_scrore (not softmax)
+    :param target: [0.7 0.2 0.1]
     :return:
     """
     # y = y[:, :7]
-    l_softmax = log_softmax(target, 1)
+    l_softmax = log_softmax(pred, 1)
 
-    a = -y * l_softmax
+    a = -target * l_softmax
     a = torch.sum(a, dim=1)
 
     return a
@@ -242,15 +242,15 @@ def prob_loss(input, target, **kwargs):
     return torch.mean(prob_loss_raw(input, target, **kwargs))
 
 
-def prob_acc(target, y, **kwargs):
+def prob_acc(pred, target, **kwargs):
     """
     accuracy when y input as raw probability instead a int number
     use when prob is not 1/0
-    :param target: raw_score
-    :param y: [0.7 0.2 0.1]
+    :param pred: raw_score
+    :param target: [0.7 0.2 0.1]
     :return: accuracy
     """
-    return accuracy(target, torch.argmax(y, dim=1))
+    return accuracy(pred, torch.argmax(target, dim=1))
 
 
 def joint_acc(preds, target, **kwargs):
