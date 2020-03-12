@@ -134,6 +134,36 @@ def basic_model_build(**config):
     return learn, learn.layer_groups
 
 
+def create_obj_model(**config):
+    """
+    Follow Pipeline Process template.
+    Make a leaner and set to config, update and return the new one.
+    Note: by new style, it is not need to use `prlab.fastai.pipeline.basic_model_build` to load this function,
+    directly add to pipeline instead.
+    :param config: contains model_class or model_func (old)
+    :return: new config with update learn, model and layer_groups
+    """
+    set_if(config, 'model_class', config.get('model_func', None)) # for back support, but not necessary needed
+    model_class, _ = load_func_by_name(config['model_class'])
+    model = model_class(**config)
+    if hasattr(model, 'load_weights'):
+        model.load_weights(**config)
+    layer_groups = model.layer_groups() if hasattr(model, 'layer_groups') else [model]
+
+    learn = Learner(config['data_train'], model=model,
+                    layer_groups=layer_groups,
+                    model_dir=config['cp'])
+    (config['cp'] / "model.txt").open('a').write(str(learn.model))
+
+    config.update({
+        'learn': learn,
+        'model': model,
+        'layer_groups': layer_groups,
+    })
+
+    return config
+
+
 def stn_based(**config):
     """
     model_func need return at least learn, model and layer_groups
