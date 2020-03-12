@@ -394,38 +394,26 @@ def run_learner_report(learn, data=None, data_test=None, class_names=None, ret_o
     return o if ret_only_fig else (valid_acc1, valid_acc, test_acc1, test_acc, o)
 
 
-def general_configure(**kwargs):
+def general_configure(**config):
     """
     Widely used for basic configure for fastai train/test
-    :param kwargs:
+    :param config:
     :return:
     """
-    # this configure just same minimal key need, must update from kwargs
-    config = {
-        'path': '/ws/data/ferplus-named',
-        'model_path': '/ws/models/ferplus',
-        'csv_path': '/ws/data/ferplus-named/ferplus-meta.csv',
-        'data_helper': 'prlab.emotion.ferplus.data_helper.FerplusDataHelper',
-        'metrics': ['prlab.fastai.utils.prob_acc'],
-        'max_rotate': 30.,
-        'max_zoom': 1.2,
-    }
-    config.update(**kwargs)
-
     config['path'] = Path(config['path'])
     config['model_path'] = Path(config['model_path'])
 
     loss_func = config.get('loss_func', None)
     config.update({
         'data_helper': convert_to_obj(config['data_helper'], **config),
-        'metrics': convert_to_fn(config['metrics'], **config),
-        'loss_func': convert_to_fn(loss_func, **config) if isinstance(loss_func, str) else None,
+        'metrics': convert_to_fn(config.get('metrics', None), **config),
+        'loss_func': convert_to_fn(loss_func, **config) if isinstance(loss_func, str) else loss_func,
         'tfms': get_transforms(max_rotate=config['max_rotate'], max_zoom=config['max_zoom'], xtra_tfms=[]),
     })
 
     cp, best_name, csv_log = make_check_point_folder(config, None, config['run'])
     config.update({
-        'callback_fn': lambda: get_callbacks(best_name=best_name, csv_filename=csv_log, monitor='prob_acc'),
+        'callback_fn': lambda: get_callbacks(best_name=best_name, csv_filename=csv_log),
     })
     print(cp)
 
