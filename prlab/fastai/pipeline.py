@@ -22,7 +22,7 @@ from outside.scikit.plot_confusion_matrix import plot_confusion_matrix
 from outside.stn import STN
 from outside.super_resolution.srnet import SRNet3
 from prlab.fastai.utils import general_configure, base_arch_str_to_obj
-from prlab.gutils import load_func_by_name
+from prlab.gutils import load_func_by_name, set_if
 
 
 def pipeline_control(**kwargs):
@@ -462,6 +462,8 @@ def resume_learner(**config):
     return config
 
 
+@deprecation.deprecated(
+    details='use `prlab.fastai.pipeline.base_weights_load` for general case, note: change the params')
 def vgg16_weights_load(**config):
     """
     Use together with `prlab.fastai.pipeline.sr_xn_stn` to load pre-trained weights for
@@ -471,12 +473,31 @@ def vgg16_weights_load(**config):
     :param config:
     :return:
     """
-    learn = config['learn']
     vgg16_weights_path = '/ws/models/ferplus/vgg16_bn_quick/final.w'
-    vgg16_weights_path = vgg16_weights_path if config.get('xvgg16_weights_path', None) is None else config[
-        'xvgg16_weights_path']
-    out = learn.model[2].load_state_dict(torch.load(vgg16_weights_path), strict=False)
-    print('load vgg16 status', out)
+    config = set_if(config, 'xvgg16_weights_path', vgg16_weights_path)
+    config = set_if(config, 'base_weights_path', config['xvgg16_weights_path'])
+
+    return base_weights_load(**config)
+
+
+def base_weights_load(**config):
+    """
+    Pipeline Process template.
+    Load for vgg, resnet, ... which in the latest layer (classifier layer)
+    Mostly use with `prlab.fastai.pipeline.stn_sr_xn`, `prlab.fastai.pipeline.sr_xn_stn`
+    should be CALL after build model and before training step
+    :param config:
+    :return:
+    """
+    learn = config['learn']
+    base_weights_path = config.get('base_weights_path', None)
+    if base_weights_path is None:
+        raise Exception('want to load for {}, weight path must provide in {}'.format(config['base_arch'],
+                                                                                     config['base_weights_path']))
+
+    # base is in the latest layer (-1) in the sequence
+    out = learn.model[-1].load_state_dict(torch.load(base_weights_path), strict=False)
+    print('load base weight {} status'.format(config['base_arch']), out)
 
     return config
 
