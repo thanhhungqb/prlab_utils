@@ -69,7 +69,7 @@ def pipeline_control_multi(**kwargs):
         # support old version of configure file
         ordered_pipeline_names = ['process_pipeline']
 
-    # this step to make sure all name could be convert to function to call laterr
+    # this step to make sure all name could be convert to function to call later
     # this is early check
     for pipe_name in ordered_pipeline_names:
         [load_func_by_name(o)[0] if isinstance(o, str) else o for o in config[pipe_name]]
@@ -354,7 +354,6 @@ def make_report_cls(**config):
     This is for CLASSIFICATION, report on accs and f1 score.
     y labels could be one-hot or prob mode.
     Run TTA 3 times and make report to screen, reports.txt and results.npy
-    :param learn:
     :param config: contains data_test store test in valid mode, tta_times (if have)
     :return: as description of `Pipeline Process template` including learn and config (not update in this func)
     """
