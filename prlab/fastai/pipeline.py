@@ -143,7 +143,7 @@ def create_obj_model(**config):
     :param config: contains model_class or model_func (old)
     :return: new config with update learn, model and layer_groups
     """
-    set_if(config, 'model_class', config.get('model_func', None)) # for back support, but not necessary needed
+    set_if(config, 'model_class', config.get('model_func', None))  # for back support, but not necessary needed
     model_class, _ = load_func_by_name(config['model_class'])
     model = model_class(**config)
     if hasattr(model, 'load_weights'):
@@ -277,10 +277,36 @@ def data_load_folder_df(**config):
     """
     Load from same folder, split by df (func)
     Follow Pipeline Process template
-    TODO not implement yet
+    Note: get image path from data_helper instead config
     :param config:
     :return: None, new_config (None for learner)
     """
+    # processor
+    data_helper = config['data_helper']
+    data_train = (
+        ImageList.from_folder(data_helper.path)
+            .filter_by_func(data_helper.filter_train_fn)
+            .split_by_valid_func(data_helper.split_valid_fn)
+            .label_from_func(data_helper.y_func)
+            .transform(config['tfms'], size=config['img_size'])
+            .databunch(bs=config['bs'])
+    ).normalize(imagenet_stats)
+    print('Load data done for train', data_train)
+
+    data_test = (
+        ImageList.from_folder(data_helper.path)
+            .split_by_valid_func(data_helper.filter_test_fn)
+            .label_from_func(data_helper.y_func)
+            .transform(config['tfms'], size=config['img_size'])
+            .databunch(bs=config['bs'])
+    ).normalize(imagenet_stats)
+    print('Load data done for test', data_test)
+
+    config.update({
+        'data_train': data_train,
+        'data': data_train,
+        'data_test': data_test
+    })
 
     return config
 
