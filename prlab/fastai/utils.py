@@ -222,7 +222,8 @@ def dificult_weight_loss(pred, target, *args, **kwargs):
 
 def prob_loss_raw(pred, target, **kwargs):
     """
-    This is a custom of SoftMaxCrossEntropy
+    This is a custom of `torch.nn.CrossEntropyLoss`.
+    NOTE: this version is nearly KL-divergence than CrossEntropy implement in pytorch?
     Loss when y input as raw probability instead a int number.
     Use when prob not 1/0 but float distribution
     :param pred: raw_scrore (not softmax)
