@@ -418,6 +418,8 @@ def make_report_cls(**config):
     cp = config['cp']
 
     data_current = learn.data  # make backup of current data of learn
+    if hasattr(learn.model, 'is_testing'):
+        learn.model.is_testing = True
     learn.data = config['data_test']
     print(config['data_test'])
 
@@ -458,6 +460,9 @@ def make_report_cls(**config):
 
     # roll back for data in learn
     learn.data = data_current
+    if hasattr(learn.model, 'is_testing'):
+        learn.model.is_testing = False
+
     return config
 
 
