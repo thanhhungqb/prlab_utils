@@ -373,6 +373,9 @@ def command_run(ctx, run_id, json_conf):
                 config2 = json.load(fp=fp)
                 config.update(**config2)
 
+    #  one more time to override configure from command line
+    config.update(**extra_args)
+
     # load function by str
     fn, mod_ = load_func_by_name(config['call'])
     out = fn(**config)
