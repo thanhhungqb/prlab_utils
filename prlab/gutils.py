@@ -269,7 +269,11 @@ def load_func_by_name(func_str):
     :return: fn, module
     """
     func_str = obj_func_str_split(func_str)
-    mod_name, func_name = func_str.rsplit('.', 1)
+    mod_name, func_name = func_str.rsplit('.', 1) if '.' in func_str else (__name__, func_str)
+    if mod_name == '':
+        # for related form .fn
+        mod_name = __name__
+
     mod = importlib.import_module(mod_name)
     func = getattr(mod, func_name)
     return func, mod
