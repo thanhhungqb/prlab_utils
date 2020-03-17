@@ -392,6 +392,7 @@ def training_freeze(**config):
     lr = config.get('lr', 5e-3)
     learn.freeze_to(config.get('freeze_to', -1))
     learn.fit_one_cycle(config.get('epochs', 30), max_lr=lr)
+    torch.save(learn.model.state_dict(), config['cp'] / 'freeze.w')
 
     learn.unfreeze()
     lr_2 = config.get('lr_2', lr)
