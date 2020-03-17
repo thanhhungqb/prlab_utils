@@ -149,8 +149,11 @@ def create_obj_model(**config):
     if hasattr(model, 'load_weights'):
         model.load_weights(**config)
     layer_groups = model.layer_groups() if hasattr(model, 'layer_groups') else [model]
+    opt = partial(optim.SGD, momentum=config.get('momentum', 0.9)) \
+        if config.get('opt_func', None) is not None and config['opt_func'] == 'SGD' else AdamW
 
     learn = Learner(config['data_train'], model=model,
+                    opt_func=opt,
                     layer_groups=layer_groups,
                     model_dir=config['cp'])
     (config['cp'] / "model.txt").open('a').write(str(learn.model))
