@@ -241,6 +241,31 @@ def stn_sr_xn(**config):
     return learn, layer_groups
 
 
+def wrap_pipeline_style_fn(old_func):
+    """
+    Wrap the old_func to new style fn(**config): new_config and then can add to pipeline directly
+    :param old_func: fn(**config): learn, layer_groups
+    :return: a function fn(**config): new_config
+    """
+
+    def _fn(**config):
+        learn, layer_groups = old_func(**config)
+        config.update({
+            'learn': learn,
+            'model': learn.model,
+            'layer_groups': layer_groups,
+        })
+        return config
+
+    return _fn
+
+
+basic_model_build_ = wrap_pipeline_style_fn(basic_model_build)
+stn_based_ = wrap_pipeline_style_fn(stn_based)
+sr_xn_stn_ = wrap_pipeline_style_fn(sr_xn_stn)
+stn_sr_xn_ = wrap_pipeline_style_fn(stn_sr_xn)
+
+
 # *************** DATA **********************************
 def data_load_folder(**config):
     """
