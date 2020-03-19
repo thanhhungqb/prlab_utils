@@ -392,47 +392,49 @@ def command_run(ctx, run_id, json_conf):
     allow_extra_args=True,
 ))
 @click.option('--run_id', default='run-00', help='run id')
-@click.option('--k', default=5, help='number of fold, default is 5')
-@click.option('--call', help='Callable (function/class) may be include full path')
 @click.option('--json_conf', default=None, help='json configure file')
-@click.option('--json_conf2', default=None,
-              help='additional json configure file, use when use base on json_conf but have small update')
 @click.pass_context
-def run_k_fold(ctx, run_id, k, call, json_conf, json_conf2):
+def run_k_fold(ctx, run_id, json_conf):
     """
     config to run k-fold with a callable command. All param will pass to callable when call.
     For complex configure, it should be in JSON file for easy to load and reuse.
     :param ctx:
     :param run_id:
-    :param k: number of fold
-    :param call: a callable, must support params fold=value and return final value
     :param json_conf: load base configure from json file
-    :param json_conf2: additional configure, override the first file
     :return:
     """
     print('run ID', run_id)
-    print('run {} folds'.format(k))
 
     config = {}
     if json_conf:
         with open(json_conf) as fp:
             config = json.load(fp=fp)
 
-    if json_conf2:
-        with open(json_conf2) as fp:
-            config2 = json.load(fp=fp)
-            config.update(**config2)
-
     extra_args = parse_extra_args_click(ctx)
     config.update(**extra_args)
+
+    # all other configure json_conf2, ... will be in config too
+    for idx in range(20):
+        additional_conf = 'json_conf{}'.format(idx)
+        if config.get(additional_conf, None) is not None:
+            with open(config[additional_conf]) as fp:
+                config2 = json.load(fp=fp)
+                config.update(**config2)
+
+    #  one more time to override configure from command line
+    config.update(**extra_args)
+
     config['run_id'] = run_id
+    set_if(config, 'k', 5)
 
     print('final configure', config)
+    print('run {} folds'.format(config['k']))
     # load function by str
-    fn, mod_ = load_func_by_name(call)
+    fn, mod_ = load_func_by_name(config['call'])
 
     out = []
-    for fold in range(0, k):
+    k_start = config.get('k_start', 0)
+    for fold in range(k_start, config['k'] + k_start):
         out.append(fn(fold=fold, **config))
 
     print(out)
