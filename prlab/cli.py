@@ -4,16 +4,17 @@ from prlab.gutils import command_run, run_k_fold
 
 """
 General run by call package with configure from file (JSON) or command line args
+Now support two sub-command: run and k_fold
 Usage:
-    python -m prlab.run --run_id test --call prlab.emotion.ferplus.sr_stn_vgg_8classes.train_test_control \
-        --run 8-sr-stn-adam+sgd-05
+    python -m prlab.cli run --json_conf2 tmp/t.json --run to-del
+    or
+    python -m prlab.cli k_fold --call prlab.medical.k_fold.run_one_fold --json_conf config/medicine.json
 """
 
 
-@click.group(invoke_without_command=True)
-@click.option('--debug/--no-debug', default=False)
+@click.group()
 @click.pass_context
-def cli(ctx, debug):
+def cli(ctx):
     if ctx.invoked_subcommand is None:
         click.echo('I was invoked without subcommand')
     else:
