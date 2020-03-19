@@ -400,7 +400,7 @@ def command_run(ctx, run_id, json_conf):
 @click.pass_context
 def run_k_fold(ctx, run_id, k, call, json_conf, json_conf2):
     """
-    config to run command with callable. All param will pass to callable when call.
+    config to run k-fold with a callable command. All param will pass to callable when call.
     For complex configure, it should be in JSON file for easy to load and reuse.
     :param ctx:
     :param run_id:
