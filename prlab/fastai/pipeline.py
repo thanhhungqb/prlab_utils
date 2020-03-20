@@ -146,7 +146,7 @@ def tabular_dnn_learner_build(**config):
     learn = tabular_learner(data_train,
                             layers=config['dnn_layers'],
                             emb_szs=config['emb_szs'],
-                            model_dir=config.get('model_dir', 'models'))
+                            model_dir=config.get('cp', 'models'))
 
     config.update({
         'learn': learn, 'model': learn.model, 'layer_groups': learn.layer_groups
