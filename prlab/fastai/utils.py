@@ -11,11 +11,12 @@ from fastai.basic_data import DatasetType
 from fastai.callbacks import SaveModelCallback, CSVLogger
 from fastai.metrics import top_k_accuracy, accuracy, MetricsList
 from fastai.train import ClassificationInterpretation, Learner, Callback, Tensor
-from fastai.vision import imagenet_stats
+from fastai.vision import imagenet_stats, get_transforms, models
 from torch.autograd import Variable
 from torch.nn.functional import log_softmax
 
 from outside.scikit.plot_confusion_matrix import plot_confusion_matrix
+from prlab.gutils import convert_to_obj, convert_to_fn, make_check_point_folder
 
 
 def freeze_layer(x, flag=True):
@@ -55,8 +56,8 @@ class SaveModelCallbackTTA(SaveModelCallback):
                 if current is not None and self.operator(current, self.best):
                     print(f'Better model found at epoch {epoch} with {self.monitor} value: {current}.')
                     self.best = current
-                    self.learn.save(f'{self.name}_{epoch}_{current}') if self.is_mul else \
-                        self.learn.save(f'{self.name}')
+                    self.learn.save(f'{self.name}_{epoch}_{current}') if self.is_mul else None
+                    self.learn.save(f'{self.name}')
 
 
 class CheckpointLossVarianceCallback(SaveModelCallback):
@@ -197,16 +198,16 @@ def get_callbacks(best_name='best', monitor='valid_loss', csv_filename='log', cs
     return out
 
 
-def dificult_weight_loss(y_preds, target, *args, **kwargs):
+def dificult_weight_loss(pred, target, *args, **kwargs):
     """
     loss = - 1 * log(pi) * (pj/pi), where pj is max(p_)
-    :param y_preds:
+    :param pred:
     :param target:
     :param args:
     :param kwargs:
     :return:
     """
-    softmax = log_softmax(y_preds, 1)
+    softmax = log_softmax(pred, 1)
     target_one_hot = torch.zeros(len(target.cpu()), 7).scatter_(1, target.cpu().unsqueeze(1), 1.)
 
     xa, _ = torch.max(softmax, dim=1)
@@ -219,19 +220,20 @@ def dificult_weight_loss(y_preds, target, *args, **kwargs):
     return torch.mean(a)
 
 
-def prob_loss_raw(target, y, **kwargs):
+def prob_loss_raw(pred, target, **kwargs):
     """
-    This is a custom of SoftMaxCrossEntropy
+    This is a custom of `torch.nn.CrossEntropyLoss`.
+    NOTE: this version is nearly KL-divergence than CrossEntropy implement in pytorch?
     Loss when y input as raw probability instead a int number.
     Use when prob not 1/0 but float distribution
-    :param target: raw_scrore (not softmax)
-    :param y: [0.7 0.2 0.1]
+    :param pred: raw_scrore (not softmax)
+    :param target: [0.7 0.2 0.1]
     :return:
     """
     # y = y[:, :7]
-    l_softmax = log_softmax(target, 1)
+    l_softmax = log_softmax(pred, 1)
 
-    a = -y * l_softmax
+    a = -target * l_softmax
     a = torch.sum(a, dim=1)
 
     return a
@@ -241,15 +243,15 @@ def prob_loss(input, target, **kwargs):
     return torch.mean(prob_loss_raw(input, target, **kwargs))
 
 
-def prob_acc(target, y, **kwargs):
+def prob_acc(pred, target, **kwargs):
     """
     accuracy when y input as raw probability instead a int number
     use when prob is not 1/0
-    :param target: raw_score
-    :param y: [0.7 0.2 0.1]
+    :param pred: raw_score
+    :param target: [0.7 0.2 0.1]
     :return: accuracy
     """
-    return accuracy(target, torch.argmax(y, dim=1))
+    return accuracy(pred, torch.argmax(target, dim=1))
 
 
 def joint_acc(preds, target, **kwargs):
@@ -391,6 +393,41 @@ def run_learner_report(learn, data=None, data_test=None, class_names=None, ret_o
     ys1 = torch.argmax(ys, dim=1)
     o = plot_confusion_matrix(y, ys1, classes=class_names, normalize=True)
     return o if ret_only_fig else (valid_acc1, valid_acc, test_acc1, test_acc, o)
+
+
+def general_configure(**config):
+    """
+    Widely used for basic configure for fastai train/test
+    :param config:
+    :return:
+    """
+    config['path'] = Path(config['path'])
+    config['model_path'] = Path(config['model_path'])
+
+    loss_func = config.get('loss_func', None)
+    config.update({
+        'data_helper': convert_to_obj(config['data_helper'], **config),
+        'metrics': convert_to_fn(config.get('metrics', None), **config),
+        'loss_func': convert_to_fn(loss_func, **config) if isinstance(loss_func, str) else loss_func,
+        'tfms': get_transforms(max_rotate=config['max_rotate'], max_zoom=config['max_zoom'], xtra_tfms=[]),
+    })
+
+    cp, best_name, csv_log = make_check_point_folder(config, None, config['run'])
+    config.update({
+        'callback_fn': lambda: get_callbacks(best_name=best_name, csv_filename=csv_log),
+    })
+    print(cp)
+
+    return config
+
+
+def base_arch_str_to_obj(base_arch):
+    base_arch = models.resnet152 if base_arch in ['resnet152'] \
+        else models.resnet101 if base_arch in ['resnet101'] \
+        else models.resnet50 if base_arch in ['resnet50'] \
+        else models.vgg16_bn if base_arch in ['vgg16', 'vgg16_bn'] or base_arch is None \
+        else base_arch  # custom TODO not need create base_model in below line
+    return base_arch
 
 
 top2_acc = partial(top_k_accuracy, k=2)
