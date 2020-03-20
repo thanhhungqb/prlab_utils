@@ -406,10 +406,10 @@ def general_configure(**config):
 
     loss_func = config.get('loss_func', None)
     config.update({
-        'data_helper': convert_to_obj(config['data_helper'], **config),
+        'data_helper': convert_to_obj(config.get('data_helper', None), **config),
         'metrics': convert_to_fn(config.get('metrics', None), **config),
         'loss_func': convert_to_fn(loss_func, **config) if isinstance(loss_func, str) else loss_func,
-        'tfms': get_transforms(max_rotate=config['max_rotate'], max_zoom=config['max_zoom'], xtra_tfms=[]),
+        'tfms': get_transforms_wrap(xtra_tfms=[], **config),
     })
 
     cp, best_name, csv_log = make_check_point_folder(config, None, config['run'])
@@ -419,6 +419,13 @@ def general_configure(**config):
     print(cp)
 
     return config
+
+
+def get_transforms_wrap(do_flip: bool = True, flip_vert: bool = False, max_rotate: float = 10., max_zoom: float = 1.1,
+                        max_lighting: float = 0.2, max_warp: float = 0.2, p_affine: float = 0.75,
+                        p_lighting: float = 0.75, xtra_tfms=None, **kwargs):
+    return get_transforms(do_flip, flip_vert, max_rotate, max_zoom, max_lighting, max_warp, p_affine, p_lighting,
+                          xtra_tfms)
 
 
 def base_arch_str_to_obj(base_arch):
