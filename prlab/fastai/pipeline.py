@@ -15,6 +15,7 @@ Note:
 import deprecation
 import nltk
 import sklearn
+from fastai.tabular import tabular_learner
 from fastai.vision import *
 from sklearn.metrics import confusion_matrix
 
@@ -132,6 +133,26 @@ def basic_model_build(**config):
     learn = cnn_learner(data=config['data_train'], base_arch=base_arch, model_dir=config['cp'])
     learn.unfreeze()
     return learn, learn.layer_groups
+
+
+def tabular_dnn_learner_build(**config):
+    """
+    Follow Pipeline Process template.
+    Build a DNN model (for tabular data)
+    :param config:
+    :return: new config with update learner
+    """
+    data_train = config['data_train']
+    learn = tabular_learner(data_train,
+                            layers=config['dnn_layers'],
+                            emb_szs=config['emb_szs'],
+                            model_dir=config.get('model_dir', 'models'))
+
+    config.update({
+        'learn': learn, 'model': learn.model, 'layer_groups': learn.layer_groups
+    })
+
+    return config
 
 
 def create_obj_model(**config):
