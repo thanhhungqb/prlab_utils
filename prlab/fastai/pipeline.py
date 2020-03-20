@@ -380,6 +380,28 @@ def training_simple(**config):
     return config
 
 
+def training_simple_2_steps(**config):
+    """
+    Follow Pipeline Process template.
+    Train with two steps: first with large lr for some epochs and then smaller lr with next some epochs
+    :param config:
+    :return: new config
+    """
+    learn = config['learn']
+
+    # for large lr
+    lr = config.get('lr', 1e-2)
+    epochs = config.get('epochs', 30)
+    learn.fit_one_cycle(epochs, max_lr=lr)
+
+    # smaller lr, if not given then lr/10
+    lr_2 = config.get('lr_2', lr / 10)
+    epochs_2 = config.get('epochs_2', epochs)
+    learn.fit_one_cycle(epochs_2, max_lr=lr_2)
+
+    return config
+
+
 def training_adam_sgd(**config):
     """
     A training process that use both adam and sgd, adam for first epochs and later is sgd.
