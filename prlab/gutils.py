@@ -446,6 +446,29 @@ def run_k_fold(ctx, run_id, json_conf):
     return out
 
 
+def encode_and_bind(df, features, keep_old=False):
+    """
+    One-hot vector for dataframe
+    Credit: https://stackoverflow.com/questions/37292872/how-can-i-one-hot-encode-in-python
+    Modified version to work with list of features instead one
+    :param df:
+    :param features: str or list(str)
+    :param keep_old:
+    :return:
+    """
+    # if only one feature then could pass as str instead [str]
+    if not isinstance(features, list):
+        features = [features]
+
+    dummies = [pd.get_dummies(df[[feature]]) for feature in features]
+    new_df = pd.concat([df] + dummies, axis=1)
+
+    if not keep_old:
+        new_df = new_df.drop(features, axis=1)
+
+    return new_df
+
+
 def test_make_check_point_folder():
     print(make_check_point_folder("/tmp"))
 
