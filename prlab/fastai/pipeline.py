@@ -294,6 +294,24 @@ sr_xn_stn_ = wrap_pipeline_style_fn(sr_xn_stn)
 stn_sr_xn_ = wrap_pipeline_style_fn(stn_sr_xn)
 
 
+def wrap_model(**config):
+    """
+    Load from model make by model_func
+    :param config:
+    :return:
+    """
+    fn, _ = load_func_by_name(config['model_func'])
+    model = fn(**config)
+    learn = Learner(config['data_train'], model=model, model_dir=config['cp'])
+
+    config.update({
+        'learn': learn,
+        'model': learn.model,
+        'layer_groups': model.layer_groups() if hasattr(model, 'layer_groups') else None
+    })
+    return config
+
+
 # *************** DATA **********************************
 def data_load_folder(**config):
     """
@@ -478,6 +496,32 @@ def training_freeze(**config):
     return config
 
 
+def two_step_train_saliency(**config):
+    learn = config['learn']
+
+    learn.save(config['best_name'])
+
+    learn.data = config['data_train']
+
+    lr = config.get('lr', 5e-4)
+    if not isinstance(lr, list):
+        lr = [lr / 500, lr / 100, lr / 100, lr]
+    learn.model.p = 0
+    learn.fit_one_cycle(30, max_lr=lr)
+
+    torch.save(learn.model.state_dict(), config['cp'] / 'e_{}.w'.format(config.get('epochs', 30)))
+    torch.save(learn.model.state_dict(), config['cp'] / 'final.w')
+
+    lr_2 = config.get('lr_2', lr)
+    if not isinstance(lr_2, list):
+        lr_2 = [lr_2 / 500, lr_2 / 100, lr_2 / 100, lr_2]
+    learn.model.p = 1
+    learn.fit_one_cycle(30, max_lr=lr_2)
+    torch.save(learn.model.state_dict(), config['cp'] / 'final.w')
+
+    return config
+
+
 # *************** REPORT **********************************
 def make_report_cls(**config):
     """
@@ -610,15 +654,15 @@ def transfer_weight_load(**config):
 
     weight_path = config.get('weight_transfer', None)
     if weight_path and Path(weight_path).is_file():
-        print('transfer from weights')
+        print('transfer from weights', weight_path)
         try:
             learn.model.load_state_dict(torch.load(weight_path), strict=False)
         except Exception as e:
             print(e)
 
     learner_cp_path = config.get('learner_transfer', None)
-    if learner_cp_path and Path(learner_cp_path).is_file():
-        print('transfer from checkpoint')
+    if learner_cp_path:
+        print('transfer from checkpoint', learner_cp_path)
         try:
             learn.load(learner_cp_path)
         except Exception as e:
