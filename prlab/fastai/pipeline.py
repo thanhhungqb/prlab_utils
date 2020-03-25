@@ -575,6 +575,7 @@ def resume_learner(**config):
     """
     Resume, load weight from final.w or best_name in this order.
     Note: best_name maybe newer than final.w, then will override if both found
+    Order: final.w, best_name.pth
     :param config:
     :return:
     """
@@ -592,6 +593,34 @@ def resume_learner(**config):
         print('resume from checkpoint')
         try:
             learn.load(best_name)
+        except Exception as e:
+            print(e)
+
+    return config
+
+
+def transfer_weight_load(**config):
+    """
+    Follow Pipeline Process template.
+    order: weight_transfer, learner_transfer
+    :param config:
+    :return: new config (update learn)
+    """
+    learn = config['learn']
+
+    weight_path = config.get('weight_transfer', None)
+    if weight_path and Path(weight_path).is_file():
+        print('transfer from weights')
+        try:
+            learn.model.load_state_dict(torch.load(weight_path), strict=False)
+        except Exception as e:
+            print(e)
+
+    learner_cp_path = config.get('learner_transfer', None)
+    if learner_cp_path and Path(learner_cp_path).is_file():
+        print('transfer from checkpoint')
+        try:
+            learn.load(learner_cp_path)
         except Exception as e:
             print(e)
 
