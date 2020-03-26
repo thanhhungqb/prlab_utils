@@ -365,6 +365,7 @@ def command_run(ctx, run_id, json_conf):
     if json_conf:
         with open(json_conf) as fp:
             config = json.load(fp=fp)
+        config['json_conf'] = json_conf
 
     extra_args = parse_extra_args_click(ctx)
     config.update(**extra_args)
