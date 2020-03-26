@@ -507,7 +507,8 @@ def two_step_train_saliency(**config):
     if not isinstance(lr, list):
         lr = [lr / 500, lr / 100, lr / 100, lr]
     learn.model.p = 0
-    learn.fit_one_cycle(30, max_lr=lr)
+    epochs = config.get('epochs', 30)
+    learn.fit_one_cycle(epochs, max_lr=lr)
 
     torch.save(learn.model.state_dict(), config['cp'] / 'e_{}.w'.format(config.get('epochs', 30)))
     torch.save(learn.model.state_dict(), config['cp'] / 'final.w')
@@ -516,7 +517,8 @@ def two_step_train_saliency(**config):
     if not isinstance(lr_2, list):
         lr_2 = [lr_2 / 500, lr_2 / 100, lr_2 / 100, lr_2]
     learn.model.p = 1
-    learn.fit_one_cycle(30, max_lr=lr_2)
+    epochs_2 = config.get('epochs_2', epochs)
+    learn.fit_one_cycle(epochs_2, max_lr=lr_2)
     torch.save(learn.model.state_dict(), config['cp'] / 'final.w')
 
     return config
