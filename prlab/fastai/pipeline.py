@@ -735,3 +735,20 @@ def device_setup(**config):
     """
     defaults.device = torch.device(config.get('device', 'cuda'))
     return config
+
+
+def fold_after(**config):
+    """
+    Do something for k-fold after report: move all file to new, important is checkpoint, weight
+    Move all files to fold folder
+    Follow Pipeline Process template.
+    :param config:
+    :return:
+    """
+    cp_fold = config['cp'] / f'{config.get("fold", 1)}'
+    cp_fold.mkdir(parents=True, exist_ok=True)
+
+    cp_files = [o for o in list(config['cp'].iterdir()) if o.is_file()]
+    [f.rename(cp_fold / f'{f.name}') for f in cp_files]
+
+    return config
