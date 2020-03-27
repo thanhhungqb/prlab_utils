@@ -323,7 +323,7 @@ def data_load_folder(**config):
     data_train = (
         ImageList.from_folder(config['path'])
             .split_by_folder()
-            .label_from_func(config['data_helper'].y_func, label_cls=FloatList)
+            .label_from_func(config['data_helper'].y_func, label_cls=config['data_helper'].label_cls)
             .transform(config['tfms'], size=config['img_size'])
             .databunch(bs=config['bs'])
     ).normalize(imagenet_stats)
@@ -546,6 +546,7 @@ def make_report_cls(**config):
     print(config['data_test'])
 
     accs, f1s, to_save = [], [], {}
+    uas = []
     for run_num in range(config.get('tta_times', 3)):
         ys, y = learn.TTA(ds_type=DatasetType.Valid, scale=config.get('test_scale', 1.10))
 
@@ -566,6 +567,7 @@ def make_report_cls(**config):
         fig.savefig(cp / 'run-{}.png'.format(run_num))
         cm = confusion_matrix(y_labels, ys_labels)
         cm_n = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+        uas.append(np.trace(cm_n) / len(cm_n))
         (config['cp'] / "cm.txt").open('a').write('acc: {:.4f}\tf1: {:.4f}\n{}\n{}\n\n'.format(accs[-1], f1, cm, cm_n))
         f1s.append(f1)
 
@@ -574,8 +576,9 @@ def make_report_cls(**config):
     accs_str = ' '.join(['{0:.4f}'.format(o) for o in accs])
     stats_str = ' '.join(['{0:.4f}'.format(o) for o in stats])
     f1s_str = ' '.join(['{:.4f}'.format(o) for o in f1s])
+    uas_str = ' '.join(['{:.4f}'.format(o) for o in uas])
     (config['model_path'] / "reports.txt").open('a').write(
-        '{}\t{}\tstats: {}\tf1: {}\n'.format(cp, accs_str, stats_str, f1s_str))
+        '{}\t{}\tuas: {}\tstats: {}\tf1: {}\n'.format(cp, accs_str, uas_str, stats_str, f1s_str))
     print('3 results', accs_str, 'stats', stats_str)
 
     np.save(cp / "results", to_save)
