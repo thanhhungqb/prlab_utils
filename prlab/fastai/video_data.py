@@ -478,3 +478,39 @@ class SelfRepresentImageList(ImageList):
         itemsB = [self.items[o] for o in self.pos]
 
         return self._label_from_list([func(o) for o in zip(self.items, itemsB)], label_cls=label_cls, **kwargs)
+
+
+class BalancedLabelImageList(ImageList):
+    """
+    Try to balanced the number of item in each labels, by set maximum for each
+    Note: some label have smaller than this number => not need enough, not sampling yet
+    """
+
+    def __init__(self, items, data_helper, each_class_num=5000, **kwargs):
+
+        self.data_helper = data_helper
+        self.each_class_num = each_class_num
+        # make new items by random select each_class_num for each class
+        label_fn = data_helper.y_func
+        labels = [label_fn(o) for o in items]
+        label_set = list(set(labels))
+
+        keep_labels = set([str(o) for o in range(8)])
+
+        pos = [o for o in range(len(labels))]
+        random.shuffle(pos)
+        new_items_pos = []
+        count_l = {label: 0 for label in label_set}
+        for p in pos:
+            if labels[p] in keep_labels and count_l[labels[p]] < each_class_num:
+                count_l[labels[p]] += 1
+                new_items_pos.append(p)
+            else:
+                None
+                # print('over quota for', labels[p], 'at', p)
+        new_items = [items[p] for p in new_items_pos]
+        self.items = new_items
+
+        super().__init__(self.items, **kwargs)
+
+        [self.copy_new.append(o) for o in ['each_class_num', 'data_helper']]
