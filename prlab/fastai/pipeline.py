@@ -23,6 +23,7 @@ from outside.scikit.plot_confusion_matrix import plot_confusion_matrix
 from outside.stn import STN
 from outside.super_resolution.srnet import SRNet3
 from prlab.fastai.utils import general_configure, base_arch_str_to_obj
+from prlab.fastai.video_data import BalancedLabelImageList
 from prlab.gutils import load_func_by_name, set_if, npy_arr_pretty_print
 
 
@@ -397,6 +398,60 @@ def data_load_folder_df(**config):
         'data': data_train,
         'data_test': data_test
     })
+
+    return config
+
+
+def data_load_folder_balanced(**config):
+    """
+    Follow Pipeline Process template.
+    Load from folder by name:
+        valid_pct None: train/val/test
+        valid_pct (for train/valid in path) and test in test_path
+    :param config:
+    :return: None, new_config (None for learner)
+    """
+    image_list_cls = BalancedLabelImageList
+    train_load = image_list_cls.from_folder(path=config['path'], data_helper=config['data_helper'],
+                                            each_class_num=config['each_class_num'])
+    if config.get('valid_pct', None) is None:
+        train_load = train_load.split_by_folder(train=config.get('train_folder', 'train'),
+                                                valid=config.get('valid_folder', 'valid'))
+    else:
+        train_load = train_load.split_by_rand_pct(valid_pct=config['valid_pct'], seed=config.get('seed', None))
+
+    data_train = (
+        train_load
+            .label_from_func(config['data_helper'].y_func, label_cls=config['data_helper'].label_cls)
+            .transform(config['tfms'], size=config['img_size'])
+            .databunch(bs=config['bs'])
+    ).normalize(imagenet_stats)
+    config['data_train'], config['data'] = data_train, data_train
+    print('data train', data_train)
+
+    # load test to valid to control later, ONLY USE AT TEST STEP
+    print('starting load test')
+    if config.get('valid_pct', None) is None:
+        test_load = image_list_cls.from_folder(config['path'], data_helper=config['data_helper'],
+                                               each_class_num=config['each_class_num'])
+        test_load = test_load.split_by_folder(train=config.get('train_folder', 'train'),
+                                              valid=config.get('test_folder', 'test'))
+    else:
+        # in this case, merge parent folder and just get test
+        # to make sure train is not empty and not label filter out in test set
+        test_load = image_list_cls.from_folder(config['test_path'], data_helper=config['data_helper'],
+                                               each_class_num=config['each_class_num'])
+        test_load = test_load.split_by_folder(train=config.get('train_folder', 'train'),
+                                              valid=config.get('test_folder', 'test'))
+
+    data_test = (
+        test_load
+            .label_from_func(config['data_helper'].y_func, label_cls=config['data_helper'].label_cls)
+            .transform(config['tfms'], size=config['img_size'])
+            .databunch(bs=config['bs'])
+    ).normalize(imagenet_stats)
+    config['data_test'] = data_test
+    print('data test', data_test)
 
     return config
 
