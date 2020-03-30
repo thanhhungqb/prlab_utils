@@ -470,6 +470,22 @@ def encode_and_bind(df, features, keep_old=False):
     return new_df
 
 
+def npy_arr_pretty_print(npy_arr, fm='{:.4f}'):
+    """
+    Pretty print for npy array
+    :param npy_arr:
+    :param fm: format string, default is for 4 digits float
+    :return:
+    """
+    if isinstance(npy_arr, (np.float, np.float64, np.int, np.int64)):
+        return fm.format(npy_arr)
+
+    # else, then array
+    arr_out = [npy_arr_pretty_print(o) for o in npy_arr]
+    to_print = "\t".join(arr_out) if len(npy_arr.shape) < 2 else "\n".join(arr_out)
+    return to_print
+
+
 def test_make_check_point_folder():
     print(make_check_point_folder("/tmp"))
 
