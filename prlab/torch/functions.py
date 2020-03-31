@@ -160,6 +160,8 @@ def fc_cut_label(fc, n_label=1, in_place=False):
 def fc_exchange_label(fc, new_pos=None, in_place=False):
     """
     exchange some label order with new_pos given
+    the new labels size may be differ from old, in case greater, try to fill new_pos with some
+    repeat to make sure the size, [0, 2, 1, 4, 3, 0, 0, 0...]
     :param fc:
     :param new_pos:
     :param in_place: if do in current fc
@@ -168,7 +170,7 @@ def fc_exchange_label(fc, new_pos=None, in_place=False):
     if new_pos is None:  # keep current order, do nothing
         return fc
 
-    new_fc = nn.Linear(fc.weight.size()[1], fc.weight.size()[0])
+    new_fc = nn.Linear(fc.weight.size()[1], len(new_pos))
 
     # reorder step
     w = [fc.weight[pos] for pos in new_pos]
@@ -176,7 +178,9 @@ def fc_exchange_label(fc, new_pos=None, in_place=False):
     w, b = torch.stack(w, dim=0), torch.stack(b)
 
     if in_place:
-        fc.weight.data.copy_(w), fc.bias.data.copy_(b)
+        # fc.weight.data.copy_(w), fc.bias.data.copy_(b)
+        new_fc.weight.data.copy_(w), new_fc.bias.data.copy_(b)
+        fc.weight, fc.bias = new_fc.weight, new_fc.bias
         return fc
     else:
         new_fc.weight.data.copy_(w), new_fc.bias.data.copy_(b)
