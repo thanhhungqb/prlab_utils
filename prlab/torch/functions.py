@@ -104,6 +104,7 @@ def fc_more_label(fc, n_label=1):
     """
     extend some row (more labels) for fc in pytorch
     :param fc:
+    :param n_label: number of labels to add, default is 1
     :return:
     """
     o_label = fc.weight.size()[0]
@@ -119,6 +120,32 @@ def fc_more_label(fc, n_label=1):
     new_fc.bias.data[:] = F.pad(b, (0, 1), "constant", 0)
 
     return new_fc
+
+
+def fc_exchange_label(fc, new_pos=None, in_place=False):
+    """
+    exchange some label order with new_pos given
+    :param fc:
+    :param new_pos:
+    :param in_place: if do in current fc
+    :return:
+    """
+    if new_pos is None:  # keep current order, do nothing
+        return fc
+
+    new_fc = nn.Linear(fc.weight.size()[1], fc.weight.size()[0])
+
+    # reorder step
+    w = [fc.weight[pos] for pos in new_pos]
+    b = [fc.bias[pos] for pos in new_pos]
+    w, b = torch.stack(w, dim=0), torch.stack(b)
+
+    if in_place:
+        fc.weight.data.copy_(w), fc.bias.data.copy_(b)
+        return fc
+    else:
+        new_fc.weight.data.copy_(w), new_fc.bias.data.copy_(b)
+        return new_fc
 
 # # We want to crop a 80x80 image randomly for our batch
 # # Building central crop of 80 pixel size
