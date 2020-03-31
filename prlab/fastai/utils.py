@@ -20,6 +20,7 @@ from torch.nn.functional import log_softmax
 
 from outside.scikit.plot_confusion_matrix import plot_confusion_matrix
 from prlab.gutils import convert_to_obj, make_check_point_folder, convert_to_obj_or_fn
+from prlab.torch.functions import ExLoss
 
 
 def freeze_layer(x, flag=True):
@@ -256,16 +257,47 @@ class SoftLoss(torch.nn.Module):
         super().__init__()
         self.alpha = alpha
         self.reduction = reduction
+        self.emb = None
 
     def forward(self, pred, target):
-        emb = torch.eye(pred.size()[-1])
-        t = torch.embedding(emb, target)
+        if self.emb is None:
+            self.emb = torch.eye(pred.size()[-1]).to(target.device)
+        t = torch.embedding(self.emb, target)
         soft_part = torch.ones_like(t)
         l_softmax = log_softmax(pred, 1)
         out = -t * l_softmax * self.alpha - soft_part * l_softmax * (1 - self.alpha)
         if self.reduction == 'mean':
             return torch.mean(out)
         return torch.sum(out)
+
+
+class NormWeightsLoss(ExLoss):
+    """
+    Similar to `prlab.model.pyramid_sr.norm_weights_loss` but could configure the second loss func
+    """
+
+    def __init__(self, second_loss_fn=None, **kwargs):
+        print('run in NormWeightsLoss')
+        super().__init__()
+        self.f_loss = torch.nn.CrossEntropyLoss()  # default
+        # TODO fix if second_loss_fn not support kwargs
+        if second_loss_fn:
+            self.f_loss = convert_to_obj_or_fn(second_loss_fn, **kwargs)
+            print('use second loss', self.f_loss)
+
+    def forward(self, pred, target, **kwargs):
+        if not isinstance(pred, tuple):
+            return self.f_loss(pred, target)
+
+        out, _ = pred
+        n_branches = out.size()[-1]
+        losses = [self.f_loss(out[:, :, i], target) for i in range(n_branches)]
+
+        losses = torch.stack(losses, dim=-1)
+        # loss = (losses * weights).sum(dim=-1)
+
+        loss = torch.mean(losses, dim=-1)
+        return torch.mean(loss)
 
 
 def prob_acc(pred, target, **kwargs):
