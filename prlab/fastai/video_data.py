@@ -495,14 +495,12 @@ class BalancedLabelImageList(ImageList):
         labels = [label_fn(o) for o in items]
         label_set = list(set(labels))
 
-        keep_labels = set([str(o) for o in range(8)])
-
         pos = [o for o in range(len(labels))]
         random.shuffle(pos)
         new_items_pos = []
         count_l = {label: 0 for label in label_set}
         for p in pos:
-            if labels[p] in keep_labels and count_l[labels[p]] < each_class_num:
+            if count_l[labels[p]] < each_class_num:
                 count_l[labels[p]] += 1
                 new_items_pos.append(p)
             else:
