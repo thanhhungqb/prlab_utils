@@ -636,7 +636,7 @@ def make_report_cls(**config):
         print('run', run_num, accs[-1], 'f1', f1)
 
         _, fig = plot_confusion_matrix(y_labels, ys_labels,
-                                       classes=config.get('label_names', None),
+                                       classes=np.array(config.get('label_names', None)),
                                        normalize=config.get('normalize_cm', True),
                                        title='Confusion matrix')
         fig.savefig(cp / 'run-{}.png'.format(run_num))
