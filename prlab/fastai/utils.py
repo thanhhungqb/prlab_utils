@@ -8,15 +8,18 @@ import numpy as np
 import torch
 from fastai import callbacks
 from fastai.basic_data import DatasetType
+from fastai.basic_train import Learner
+from fastai.callback import Callback
 from fastai.callbacks import SaveModelCallback, CSVLogger
-from fastai.metrics import top_k_accuracy, accuracy, MetricsList
-from fastai.train import ClassificationInterpretation, Learner, Callback, Tensor
+from fastai.metrics import top_k_accuracy, accuracy
+from fastai.torch_core import MetricsList
+from fastai.train import ClassificationInterpretation
 from fastai.vision import imagenet_stats, get_transforms, models
 from torch.autograd import Variable
 from torch.nn.functional import log_softmax
 
 from outside.scikit.plot_confusion_matrix import plot_confusion_matrix
-from prlab.gutils import convert_to_obj, convert_to_fn, make_check_point_folder
+from prlab.gutils import convert_to_obj, make_check_point_folder, convert_to_obj_or_fn
 
 
 def freeze_layer(x, flag=True):
@@ -175,7 +178,7 @@ class DataArgCallBack(Callback):
         self.transform_size = transform_size
         self.normalize = normalize
 
-    def on_epoch_end(self, epoch: int, smooth_loss: Tensor, last_metrics: MetricsList, **kwargs: Any) -> bool:
+    def on_epoch_end(self, epoch: int, smooth_loss: torch.Tensor, last_metrics: MetricsList, **kwargs: Any) -> bool:
         # do with data
         n_data = (self.src
                   .label_from_func(self.label_func)
@@ -241,6 +244,28 @@ def prob_loss_raw(pred, target, **kwargs):
 
 def prob_loss(input, target, **kwargs):
     return torch.mean(prob_loss_raw(input, target, **kwargs))
+
+
+class SoftLoss(torch.nn.Module):
+    """
+    For soft loss (not one-hot but softer) with alpha default 0.9.
+    Similar to `torch.nn.CrossEntropyLoss` but now with softer
+    """
+
+    def __init__(self, alpha=0.9, reduction='mean', **kwargs):
+        super().__init__()
+        self.alpha = alpha
+        self.reduction = reduction
+
+    def forward(self, pred, target):
+        emb = torch.eye(pred.size()[-1])
+        t = torch.embedding(emb, target)
+        soft_part = torch.ones_like(t)
+        l_softmax = log_softmax(pred, 1)
+        out = -t * l_softmax * self.alpha - soft_part * l_softmax * (1 - self.alpha)
+        if self.reduction == 'mean':
+            return torch.mean(out)
+        return torch.sum(out)
 
 
 def prob_acc(pred, target, **kwargs):
@@ -407,8 +432,8 @@ def general_configure(**config):
     loss_func = config.get('loss_func', None)
     config.update({
         'data_helper': convert_to_obj(config.get('data_helper', None), **config),
-        'metrics': convert_to_fn(config.get('metrics', None), **config),
-        'loss_func': convert_to_fn(loss_func, **config) if isinstance(loss_func, str) else loss_func,
+        'metrics': convert_to_obj_or_fn(config.get('metrics', None), **config),
+        'loss_func': convert_to_obj_or_fn(loss_func, **config) if isinstance(loss_func, str) else loss_func,
         'tfms': get_transforms_wrap(xtra_tfms=[], **config),
     })
 
