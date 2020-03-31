@@ -122,6 +122,32 @@ def fc_more_label(fc, n_label=1):
     return new_fc
 
 
+def fc_cut_label(fc, n_label=1, in_place=False):
+    """
+    cut some row (less labels) for fc in pytorch. Note: careful with the order, will cut the latest
+    If the order not correct, call `fc_exchange_label` before call this function
+    :param fc:
+    :param n_label: number of labels to remove, default is 1
+    :param in_place:
+    :return:
+    """
+    o_label = fc.weight.size()[0]
+    n_label_size = o_label - n_label
+
+    new_fc = nn.Linear(fc.weight.size()[1], n_label_size)
+
+    w, b = fc.weight, fc.bias
+
+    new_fc.weight.data.copy_(w[:n_label_size, :])
+    new_fc.bias.data.copy_(b[:n_label_size])
+
+    if in_place:
+        fc.weight, fc.bias = new_fc.weight, new_fc.bias
+        return fc
+    else:
+        return new_fc
+
+
 def fc_exchange_label(fc, new_pos=None, in_place=False):
     """
     exchange some label order with new_pos given
