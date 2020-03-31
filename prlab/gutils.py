@@ -28,6 +28,19 @@ def set_if(d, k, v, check=None):
     return d
 
 
+def convert_to_obj_or_fn(val, **params):
+    if isinstance(val, dict):
+        return {k: convert_to_obj_or_fn(v, **params) for k, v in val.items()}
+    if isinstance(val, (tuple, list)):
+        return [convert_to_obj_or_fn(o, **params) for o in val]
+    if isinstance(val, str):
+        if val.isupper():  # this is class, then call to make object
+            return load_func_by_name(val)[0](**params)
+        else:
+            return load_func_by_name(val)[0]
+    return val
+
+
 def convert_to_obj(val, **params):
     """
     Convert to function call or object
@@ -38,7 +51,7 @@ def convert_to_obj(val, **params):
     if isinstance(val, dict):
         return {k: convert_to_obj(v, **params) for k, v in val.items()}
     if isinstance(val, (tuple, list)):
-        return [convert_to_obj(o) for o in val]
+        return [convert_to_obj(o, **params) for o in val]
     if isinstance(val, str):
         return load_func_by_name(val)[0](**params)
     return val
