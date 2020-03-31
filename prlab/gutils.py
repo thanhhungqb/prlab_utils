@@ -34,7 +34,7 @@ def convert_to_obj_or_fn(val, **params):
     if isinstance(val, (tuple, list)):
         return [convert_to_obj_or_fn(o, **params) for o in val]
     if isinstance(val, str):
-        if val.isupper():  # this is class, then call to make object
+        if val.rsplit('.', 1)[-1][0].isupper():  # this is class, then call to make object
             return load_func_by_name(val)[0](**params)
         else:
             return load_func_by_name(val)[0]
