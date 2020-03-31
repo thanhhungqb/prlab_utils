@@ -414,6 +414,7 @@ def data_load_folder_balanced(**config):
     image_list_cls = BalancedLabelImageList
     train_load = image_list_cls.from_folder(path=config['path'], data_helper=config['data_helper'],
                                             each_class_num=config['each_class_num'])
+    train_load = train_load.filter_by_func(config['data_helper'].filter_func)
     if config.get('valid_pct', None) is None:
         train_load = train_load.split_by_folder(train=config.get('train_folder', 'train'),
                                                 valid=config.get('valid_folder', 'valid'))
@@ -432,15 +433,15 @@ def data_load_folder_balanced(**config):
     # load test to valid to control later, ONLY USE AT TEST STEP
     print('starting load test')
     if config.get('valid_pct', None) is None:
-        test_load = image_list_cls.from_folder(config['path'], data_helper=config['data_helper'],
-                                               each_class_num=config['each_class_num'])
+        test_load = ImageList.from_folder(config['path'])
+        test_load = test_load.filter_by_func(config['data_helper'].filter_func)
         test_load = test_load.split_by_folder(train=config.get('train_folder', 'train'),
                                               valid=config.get('test_folder', 'test'))
     else:
         # in this case, merge parent folder and just get test
         # to make sure train is not empty and not label filter out in test set
-        test_load = image_list_cls.from_folder(config['test_path'], data_helper=config['data_helper'],
-                                               each_class_num=config['each_class_num'])
+        test_load = ImageList.from_folder(config['test_path'])
+        test_load = test_load.filter_by_func(config['data_helper'].filter_func)
         test_load = test_load.split_by_folder(train=config.get('train_folder', 'train'),
                                               valid=config.get('test_folder', 'test'))
 
