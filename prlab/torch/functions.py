@@ -15,6 +15,15 @@ class PassThrough(nn.Module):
         return input[0]
 
 
+class ExLoss(nn.Module):
+    """
+    Just extend to allow any params
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__()
+
+
 def make_theta_from_st(st, is_inverse=False):
     """
     ST without rotate
