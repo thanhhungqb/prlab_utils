@@ -620,6 +620,12 @@ def make_report_cls(**config):
         learn.model.is_testing = True
     learn.data = config['data_test']
     print(config['data_test'])
+    if hasattr(config['data_test'], 'classes') and config['data_test'].classes is not None:
+        classes = np.array(config['data_test'].classes)
+    else:
+        classes = np.array(config.get('label_names', None))
+
+    print('classes (order)', classes)
 
     accs, f1s, to_save = [], [], {}
     uas = []
@@ -637,7 +643,7 @@ def make_report_cls(**config):
         print('run', run_num, accs[-1], 'f1', f1)
 
         _, fig = plot_confusion_matrix(y_labels, ys_labels,
-                                       classes=np.array(config.get('label_names', None)),
+                                       classes=classes,
                                        normalize=config.get('normalize_cm', True),
                                        title='Confusion matrix')
         fig.savefig(cp / 'run-{}.png'.format(run_num))
