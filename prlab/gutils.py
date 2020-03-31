@@ -481,7 +481,7 @@ def npy_arr_pretty_print(npy_arr, fm='{:.4f}'):
         return fm.format(npy_arr)
 
     # else, then array
-    arr_out = [npy_arr_pretty_print(o) for o in npy_arr]
+    arr_out = [npy_arr_pretty_print(o, fm=fm) for o in npy_arr]
     to_print = "\t".join(arr_out) if len(npy_arr.shape) < 2 else "\n".join(arr_out)
     return to_print
 
