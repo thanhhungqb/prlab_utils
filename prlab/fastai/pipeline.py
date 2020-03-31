@@ -23,7 +23,8 @@ from outside.scikit.plot_confusion_matrix import plot_confusion_matrix
 from outside.stn import STN
 from outside.super_resolution.srnet import SRNet3
 from prlab.fastai.utils import general_configure, base_arch_str_to_obj
-from prlab.gutils import load_func_by_name, set_if
+from prlab.fastai.video_data import BalancedLabelImageList
+from prlab.gutils import load_func_by_name, set_if, npy_arr_pretty_print
 
 
 def pipeline_control(**kwargs):
@@ -294,18 +295,44 @@ sr_xn_stn_ = wrap_pipeline_style_fn(sr_xn_stn)
 stn_sr_xn_ = wrap_pipeline_style_fn(stn_sr_xn)
 
 
+def wrap_model(**config):
+    """
+    Load from model make by model_func
+    :param config:
+    :return:
+    """
+    fn, _ = load_func_by_name(config['model_func'])
+    model = fn(**config)
+    learn = Learner(config['data_train'], model=model, model_dir=config['cp'])
+
+    config.update({
+        'learn': learn,
+        'model': learn.model,
+        'layer_groups': model.layer_groups() if hasattr(model, 'layer_groups') else None
+    })
+    return config
+
+
 # *************** DATA **********************************
 def data_load_folder(**config):
     """
     Follow Pipeline Process template.
-    Load from folder by name: train/val/test
+    Load from folder by name:
+        valid_pct None: train/val/test
+        valid_pct (for train/valid in path) and test in test_path
     :param config:
     :return: None, new_config (None for learner)
     """
+    train_load = ImageList.from_folder(config['path'])
+    if config.get('valid_pct', None) is None:
+        train_load = train_load.split_by_folder(train=config.get('train_folder', 'train'),
+                                                valid=config.get('valid_folder', 'valid'))
+    else:
+        train_load = train_load.split_by_rand_pct(valid_pct=config['valid_pct'], seed=config.get('seed', None))
+
     data_train = (
-        ImageList.from_folder(config['path'])
-            .split_by_folder()
-            .label_from_func(config['data_helper'].y_func, label_cls=FloatList)
+        train_load
+            .label_from_func(config['data_helper'].y_func, label_cls=config['data_helper'].label_cls)
             .transform(config['tfms'], size=config['img_size'])
             .databunch(bs=config['bs'])
     ).normalize(imagenet_stats)
@@ -313,9 +340,20 @@ def data_load_folder(**config):
     print('data train', data_train)
 
     # load test to valid to control later, ONLY USE AT TEST STEP
+    print('starting load test')
+    if config.get('valid_pct', None) is None:
+        test_load = ImageList.from_folder(config['path'])
+        test_load = test_load.split_by_folder(train=config.get('train_folder', 'train'),
+                                              valid=config.get('test_folder', 'test'))
+    else:
+        # in this case, merge parent folder and just get test
+        # to make sure train is not empty and not label filter out in test set
+        test_load = ImageList.from_folder(config['test_path'])
+        test_load = test_load.split_by_folder(train=config.get('train_folder', 'train'),
+                                              valid=config.get('test_folder', 'test'))
+
     data_test = (
-        ImageList.from_folder(config['path'])
-            .split_by_folder(valid='test')
+        test_load
             .label_from_func(config['data_helper'].y_func, label_cls=config['data_helper'].label_cls)
             .transform(config['tfms'], size=config['img_size'])
             .databunch(bs=config['bs'])
@@ -360,6 +398,61 @@ def data_load_folder_df(**config):
         'data': data_train,
         'data_test': data_test
     })
+
+    return config
+
+
+def data_load_folder_balanced(**config):
+    """
+    Follow Pipeline Process template.
+    Load from folder by name:
+        valid_pct None: train/val/test
+        valid_pct (for train/valid in path) and test in test_path
+    :param config:
+    :return: None, new_config (None for learner)
+    """
+    image_list_cls = BalancedLabelImageList
+    train_load = image_list_cls.from_folder(path=config['path'], data_helper=config['data_helper'],
+                                            each_class_num=config['each_class_num'])
+    train_load = train_load.filter_by_func(config['data_helper'].filter_func)
+    if config.get('valid_pct', None) is None:
+        train_load = train_load.split_by_folder(train=config.get('train_folder', 'train'),
+                                                valid=config.get('valid_folder', 'valid'))
+    else:
+        train_load = train_load.split_by_rand_pct(valid_pct=config['valid_pct'], seed=config.get('seed', None))
+
+    data_train = (
+        train_load
+            .label_from_func(config['data_helper'].y_func, label_cls=config['data_helper'].label_cls)
+            .transform(config['tfms'], size=config['img_size'])
+            .databunch(bs=config['bs'])
+    ).normalize(imagenet_stats)
+    config['data_train'], config['data'] = data_train, data_train
+    print('data train', data_train)
+
+    # load test to valid to control later, ONLY USE AT TEST STEP
+    print('starting load test')
+    if config.get('valid_pct', None) is None:
+        test_load = ImageList.from_folder(config['path'])
+        test_load = test_load.filter_by_func(config['data_helper'].filter_func)
+        test_load = test_load.split_by_folder(train=config.get('train_folder', 'train'),
+                                              valid=config.get('test_folder', 'test'))
+    else:
+        # in this case, merge parent folder and just get test
+        # to make sure train is not empty and not label filter out in test set
+        test_load = ImageList.from_folder(config['test_path'])
+        test_load = test_load.filter_by_func(config['data_helper'].filter_func)
+        test_load = test_load.split_by_folder(train=config.get('train_folder', 'train'),
+                                              valid=config.get('test_folder', 'test'))
+
+    data_test = (
+        test_load
+            .label_from_func(config['data_helper'].y_func, label_cls=config['data_helper'].label_cls)
+            .transform(config['tfms'], size=config['img_size'])
+            .databunch(bs=config['bs'])
+    ).normalize(imagenet_stats)
+    config['data_test'] = data_test
+    print('data test', data_test)
 
     return config
 
@@ -478,6 +571,34 @@ def training_freeze(**config):
     return config
 
 
+def two_step_train_saliency(**config):
+    learn = config['learn']
+
+    learn.save(config['best_name'])
+
+    learn.data = config['data_train']
+
+    lr = config.get('lr', 5e-4)
+    if not isinstance(lr, list):
+        lr = [lr / 500, lr / 100, lr / 100, lr]
+    learn.model.p = 0
+    epochs = config.get('epochs', 30)
+    learn.fit_one_cycle(epochs, max_lr=lr)
+
+    torch.save(learn.model.state_dict(), config['cp'] / 'e_{}.w'.format(config.get('epochs', 30)))
+    torch.save(learn.model.state_dict(), config['cp'] / 'final.w')
+
+    lr_2 = config.get('lr_2', lr)
+    if not isinstance(lr_2, list):
+        lr_2 = [lr_2 / 500, lr_2 / 100, lr_2 / 100, lr_2]
+    learn.model.p = 1
+    epochs_2 = config.get('epochs_2', epochs)
+    learn.fit_one_cycle(epochs_2, max_lr=lr_2)
+    torch.save(learn.model.state_dict(), config['cp'] / 'final.w')
+
+    return config
+
+
 # *************** REPORT **********************************
 def make_report_cls(**config):
     """
@@ -500,6 +621,7 @@ def make_report_cls(**config):
     print(config['data_test'])
 
     accs, f1s, to_save = [], [], {}
+    uas = []
     for run_num in range(config.get('tta_times', 3)):
         ys, y = learn.TTA(ds_type=DatasetType.Valid, scale=config.get('test_scale', 1.10))
 
@@ -520,7 +642,11 @@ def make_report_cls(**config):
         fig.savefig(cp / 'run-{}.png'.format(run_num))
         cm = confusion_matrix(y_labels, ys_labels)
         cm_n = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
-        (config['cp'] / "cm.txt").open('a').write('acc: {:.4f}\tf1: {:.4f}\n{}\n{}\n\n'.format(accs[-1], f1, cm, cm_n))
+        uas.append(np.trace(cm_n) / len(cm_n))
+        (config['cp'] / "cm.txt").open('a').write(
+            'acc: {:.4f}\tf1: {:.4f}\n{}\n{}\n\n'.format(accs[-1], f1,
+                                                         npy_arr_pretty_print(cm, fm='{:>8}'),
+                                                         npy_arr_pretty_print(cm_n)))
         f1s.append(f1)
 
     stats = [np.average(accs), np.std(accs), np.max(accs), np.median(accs)]
@@ -528,8 +654,9 @@ def make_report_cls(**config):
     accs_str = ' '.join(['{0:.4f}'.format(o) for o in accs])
     stats_str = ' '.join(['{0:.4f}'.format(o) for o in stats])
     f1s_str = ' '.join(['{:.4f}'.format(o) for o in f1s])
+    uas_str = ' '.join(['{:.4f}'.format(o) for o in uas])
     (config['model_path'] / "reports.txt").open('a').write(
-        '{}\t{}\tstats: {}\tf1: {}\n'.format(cp, accs_str, stats_str, f1s_str))
+        '{}\t{}\tuas: {}\tstats: {}\tf1: {}\n'.format(cp, accs_str, uas_str, stats_str, f1s_str))
     print('3 results', accs_str, 'stats', stats_str)
 
     np.save(cp / "results", to_save)
@@ -575,6 +702,7 @@ def resume_learner(**config):
     """
     Resume, load weight from final.w or best_name in this order.
     Note: best_name maybe newer than final.w, then will override if both found
+    Order: final.w, best_name.pth
     :param config:
     :return:
     """
@@ -592,6 +720,34 @@ def resume_learner(**config):
         print('resume from checkpoint')
         try:
             learn.load(best_name)
+        except Exception as e:
+            print(e)
+
+    return config
+
+
+def transfer_weight_load(**config):
+    """
+    Follow Pipeline Process template.
+    order: weight_transfer, learner_transfer
+    :param config:
+    :return: new config (update learn)
+    """
+    learn = config['learn']
+
+    weight_path = config.get('weight_transfer', None)
+    if weight_path and Path(weight_path).is_file():
+        print('transfer from weights', weight_path)
+        try:
+            learn.model.load_state_dict(torch.load(weight_path), strict=False)
+        except Exception as e:
+            print(e)
+
+    learner_cp_path = config.get('learner_transfer', None)
+    if learner_cp_path:
+        print('transfer from checkpoint', learner_cp_path)
+        try:
+            learn.load(learner_cp_path)
         except Exception as e:
             print(e)
 
@@ -661,4 +817,21 @@ def device_setup(**config):
     :return:
     """
     defaults.device = torch.device(config.get('device', 'cuda'))
+    return config
+
+
+def fold_after(**config):
+    """
+    Do something for k-fold after report: move all file to new, important is checkpoint, weight
+    Move all files to fold folder
+    Follow Pipeline Process template.
+    :param config:
+    :return:
+    """
+    cp_fold = config['cp'] / f'{config.get("fold", 1)}'
+    cp_fold.mkdir(parents=True, exist_ok=True)
+
+    cp_files = [o for o in list(config['cp'].iterdir()) if o.is_file()]
+    [f.rename(cp_fold / f'{f.name}') for f in cp_files]
+
     return config
