@@ -818,8 +818,13 @@ def exchange_fc(**config):
     if base_weights_path is not None and Path(base_weights_path).is_file():
         state_dict = torch.load(base_weights_path)
 
+        two_latest_keys = list(state_dict.keys())[-2:]
+        stored_lbl_size = state_dict[two_latest_keys[-1]].size()[0]
+        if stored_lbl_size != config['n_classes']:
+            base_model = create_cnn_model(base_arch=base_arch, nc=stored_lbl_size)
+
         o = base_model.load_state_dict(state_dict=state_dict, strict=False)
-        print('transfer load weights from ', base_weights_path, o)
+        print('load weights to exchange from ', base_weights_path, o)
 
     fc_here = base_model[-1]
     if isinstance(fc_here, nn.Sequential):
