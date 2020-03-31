@@ -25,6 +25,7 @@ from outside.super_resolution.srnet import SRNet3
 from prlab.fastai.utils import general_configure, base_arch_str_to_obj
 from prlab.fastai.video_data import BalancedLabelImageList
 from prlab.gutils import load_func_by_name, set_if, npy_arr_pretty_print
+from prlab.torch.functions import fc_exchange_label
 
 
 def pipeline_control(**kwargs):
@@ -791,6 +792,37 @@ def base_weights_load(**config):
     out = learn.model[-1].load_state_dict(torch.load(base_weights_path), strict=False)
     print('load base weight {} status'.format(config['base_arch']), out)
 
+    return config
+
+
+def exchange_fc(**config):
+    """
+    load weights and update order of label (fc layer at the latest)
+    Must provide:
+        new_pos, if none then no exchange, e.g. [1, 0, 2, 3, 4, 5, 6, 7]
+    LOAD BEFORE MODEL LOAD/RESUME/BUILD
+    :return: update base_weights_path
+    """
+    print("Do the FC exchange for label order change")
+    print('new order', config.get('new_pos', None))
+    base_arch = base_arch_str_to_obj(config.get('base_arch', 'vgg16_bn'))
+
+    base_weights_path = config.get('base_weights_path', None)
+    base_model = create_cnn_model(base_arch=base_arch, nc=config['n_classes'])
+    if base_weights_path is not None and Path(base_weights_path).is_file():
+        state_dict = torch.load(base_weights_path)
+
+        o = base_model.load_state_dict(state_dict=state_dict, strict=False)
+        print('transfer load weights from ', base_weights_path, o)
+
+    fc_here = base_model[-1]
+    if isinstance(fc_here, nn.Sequential):
+        fc_here = fc_here[-1]
+    fc_exchange_label(fc_here, config.get('new_pos', None), in_place=True)
+    save_to = config.get('base_weights_path_transfer', '/tmp/{}.w'.format(config.get('base_arch', 'vgg16_bn')))
+    torch.save(base_model.state_dict(), save_to)
+
+    config['base_weights_path'] = save_to
     return config
 
 
