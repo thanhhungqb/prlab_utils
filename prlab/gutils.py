@@ -118,6 +118,19 @@ def to_json_writeable(js):
     return str(js)
 
 
+def backup_file(file_path, n=0):
+    file_path = file_path if isinstance(file_path, Path) else Path(file_path)
+    if file_path.is_file():
+        next_f = file_path.parent / f'{file_path.name}.{n}'
+        if next_f.is_file():
+            return backup_file(file_path, n + 1)
+        else:
+            file_path.rename(next_f)
+            return next_f
+    else:
+        return None
+
+
 def make_check_point_folder(config={}, cp_base=None, cp_name=None):
     """
     make a checkpoint folder and csv log
@@ -143,6 +156,7 @@ def make_check_point_folder(config={}, cp_base=None, cp_name=None):
     txtwriter = cp_path / 'configure.txt'
     txtwriter.write_text(str(config)) if not txtwriter.is_file() else None
     try:
+        backup_file(cp_path / 'configure.json')  # backup old file in this folder
         with open(cp_path / 'configure.json', 'w') as f:
             json.dump(to_json_writeable(config), f, indent=2)
     except Exception as e:
