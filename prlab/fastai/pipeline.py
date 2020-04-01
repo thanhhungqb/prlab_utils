@@ -625,6 +625,10 @@ def make_report_cls(**config):
     else:
         classes = np.array(config.get('label_names', None))
 
+    # when we want to override classes in data_test to another from configure, one flag need
+    if config.get('replace_classes', False):
+        classes = np.array(config.get('label_names', None))
+
     print('classes (order)', classes)
 
     accs, f1s, to_save = [], [], {}
@@ -713,6 +717,7 @@ def resume_learner(**config):
     :param config:
     :return:
     """
+    print('resume step')
     learn = config['learn']
     best_name = config.get('best_name', 'best')
 
