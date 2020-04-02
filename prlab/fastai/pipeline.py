@@ -493,7 +493,7 @@ def training_simple_2_steps(**config):
     learn.fit_one_cycle(epochs, max_lr=lr)
 
     # smaller lr, if not given then lr/10
-    lr_2 = config.get('lr_2', lr / 10)
+    lr_2 = config.get('lr_2', lr)
     epochs_2 = config.get('epochs_2', epochs)
     learn.fit_one_cycle(epochs_2, max_lr=lr_2)
 
@@ -540,7 +540,7 @@ def training_adam_sgd(**config):
     config = learn_general_setup(**config)
     learn.data = data_train
 
-    lr = config.get('lr_2', 1e-4)
+    lr = config.get('lr_2', lr)
     learn.fit_one_cycle(config.get('epochs_2', 30), max_lr=lr)
 
     torch.save(learn.model.state_dict(), config['cp'] / 'final.w')
