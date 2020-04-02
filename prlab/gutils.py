@@ -498,6 +498,44 @@ def encode_and_bind(df, features, keep_old=False, drop_first=False, **kwargs):
     return new_df
 
 
+def column_map(df, feature_names, new_val, keep_old=False, **kwargs):
+    """
+    Mapping column values
+    :param df:
+    :param feature_names: [field_name]
+    :param new_val: {field_name; {val:new_val}, new_val is value or 1-D array, must same length
+    :param keep_old:
+    :param kwargs:
+    :return:
+    """
+    if not isinstance(feature_names, list):
+        feature_names = [feature_names]
+
+    new_df = pd.DataFrame()
+    for field_name in feature_names:
+        print('do for field', field_name)
+        for k, v in new_val[field_name].items():
+            xlen = len(v) if isinstance(v, list) else 1
+            # xlen = len(new_val[field_name])
+        x_names = ['{}_{}'.format(field_name, o) for o in range(xlen)]
+
+        na_value = new_val[field_name]["#na#"]
+        for o in df[field_name]:
+            if new_val[field_name].get(o, None) is None:
+                new_val[field_name][o] = na_value
+
+        df[field_name] = df[field_name].str.strip()
+        col = df[field_name].map(new_val[field_name])
+        col.fillna(pd.Series(na_value), inplace=True)
+
+        new_df[x_names] = pd.DataFrame(col.tolist())
+
+    new_df = pd.concat([df, new_df], axis=1)
+    if not keep_old:
+        new_df = new_df.drop(feature_names, axis=1)
+    return new_df
+
+
 def npy_arr_pretty_print(npy_arr, fm='{:.4f}'):
     """
     Pretty print for npy array
