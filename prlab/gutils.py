@@ -121,6 +121,21 @@ def to_json_writeable(js):
     return str(js)
 
 
+def load_json_text_lines(file_name):
+    """
+    Load text file, each line contains json
+    :param file_name:
+    :return: {line_count: JS}
+    """
+    with open(file_name) as f:
+        lines = f.readlines()
+        out = {}
+        for i, text in enumerate(lines):
+            out[i] = json.loads(text)
+
+    return out
+
+
 def backup_file(file_path, n=0):
     file_path = file_path if isinstance(file_path, Path) else Path(file_path)
     if file_path.is_file():
