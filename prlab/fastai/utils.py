@@ -461,16 +461,13 @@ def general_configure(**config):
     config['path'] = Path(config['path'])
     config['model_path'] = Path(config['model_path'])
 
+    cp, best_name, csv_log = make_check_point_folder(config, None, config['run'])
     loss_func = config.get('loss_func', None)
     config.update({
         'data_helper': convert_to_obj(config.get('data_helper', None), **config),
         'metrics': convert_to_obj_or_fn(config.get('metrics', None), **config),
         'loss_func': convert_to_obj_or_fn(loss_func, **config) if isinstance(loss_func, str) else loss_func,
         'tfms': get_transforms_wrap(xtra_tfms=[], **config),
-    })
-
-    cp, best_name, csv_log = make_check_point_folder(config, None, config['run'])
-    config.update({
         'callback_fn': lambda: get_callbacks(best_name=best_name, csv_filename=csv_log),
     })
     print(cp)
