@@ -474,7 +474,7 @@ def run_k_fold(ctx, run_id, json_conf):
     return out
 
 
-def encode_and_bind(df, features, keep_old=False):
+def encode_and_bind(df, features, keep_old=False, drop_first=False, **kwargs):
     """
     One-hot vector for dataframe
     Credit: https://stackoverflow.com/questions/37292872/how-can-i-one-hot-encode-in-python
@@ -482,13 +482,14 @@ def encode_and_bind(df, features, keep_old=False):
     :param df:
     :param features: str or list(str)
     :param keep_old:
+    :param drop_first: if true then dummies, else one-hot
     :return:
     """
     # if only one feature then could pass as str instead [str]
     if not isinstance(features, list):
         features = [features]
 
-    dummies = [pd.get_dummies(df[[feature]]) for feature in features]
+    dummies = [pd.get_dummies(df[[feature]], drop_first=drop_first) for feature in features]
     new_df = pd.concat([df] + dummies, axis=1)
 
     if not keep_old:
