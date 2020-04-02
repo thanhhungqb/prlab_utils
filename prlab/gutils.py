@@ -15,6 +15,9 @@ from sklearn import preprocessing
 Path.ls = lambda x: list(x.iterdir())
 
 
+def clean_str(s): return '_'.join(s.split()).replace('/', '')
+
+
 def set_if(d, k, v, check=None):
     """
     Set value of k to v if check in dict d, check mostly None
