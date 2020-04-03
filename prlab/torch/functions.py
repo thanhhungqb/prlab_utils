@@ -24,6 +24,27 @@ class ExLoss(nn.Module):
         super().__init__()
 
 
+class WrapLoss(nn.Module):
+    """
+    To wrap some loss does not support **kwargs
+    from `torch.nn.modules.loss._Loss`
+    """
+    _wrap = None
+
+    def __init__(self, **kwargs):
+        super().__init__()
+        if self._wrap is not None:
+            self._obj = self._wrap(reduction=kwargs.get('reduction', 'mean'))
+
+    def __call__(self, pred, target, *args, **kwargs):
+        if self._obj is not None:
+            return self._obj(pred, target, **kwargs)
+
+
+class MSELossE(WrapLoss):
+    _wrap = nn.MSELoss
+
+
 def make_theta_from_st(st, is_inverse=False):
     """
     ST without rotate
