@@ -321,12 +321,15 @@ class NormWeightsAcc:
     """
     __name__ = 'NormWeightsAcc'
 
-    def __init__(self, **config):
+    def __init__(self, part=-1, **config):
         second_metrics_fn = config.get('second_metrics_fn', 'fastai.metrics.accuracy')
+        self.part = part
         self.f_acc, _ = load_func_by_name(second_metrics_fn)
 
     def __call__(self, pred, target, *args, **kwargs):
         c_out = weights_branches(pred=pred)
+        if self.part >= 0:
+            return self.f_acc(c_out[:, self.part], target[:, self.part])
         return self.f_acc(c_out, target)
 
 
