@@ -19,8 +19,8 @@ from torch.autograd import Variable
 from torch.nn.functional import log_softmax
 
 from outside.scikit.plot_confusion_matrix import plot_confusion_matrix
-from prlab.gutils import convert_to_obj, make_check_point_folder, convert_to_obj_or_fn
-from prlab.torch.functions import ExLoss
+from prlab.gutils import convert_to_obj, make_check_point_folder, convert_to_obj_or_fn, load_func_by_name
+from prlab.torch.functions import ExLoss, weights_branches
 
 
 def freeze_layer(x, flag=True):
@@ -313,6 +313,20 @@ def prob_acc(pred, target, **kwargs):
 
 def joint_acc(preds, target, **kwargs):
     return accuracy(preds[0], target)
+
+
+class NormWeightsAcc:
+    """
+    refer to `prlab.torch.functions.norm_weights_acc` but in class mode and could modified f_acc
+    """
+
+    def __init__(self, **config):
+        second_metrics_fn = config.get('second_metrics_fn', 'fastai.metrics.accuracy')
+        self.f_acc, _ = load_func_by_name(second_metrics_fn)
+
+    def __call__(self, pred, target, *args, **kwargs):
+        c_out = weights_branches(pred=pred)
+        return self.f_acc(c_out, target)
 
 
 def make_one_hot(labels, C=2):
