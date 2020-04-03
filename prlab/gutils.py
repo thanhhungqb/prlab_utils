@@ -34,8 +34,17 @@ def set_if(d, k, v, check=None):
 def convert_to_obj_or_fn(val, **params):
     if isinstance(val, dict):
         return {k: convert_to_obj_or_fn(v, **params) for k, v in val.items()}
-    if isinstance(val, (tuple, list)):
+    if isinstance(val, list):
         return [convert_to_obj_or_fn(o, **params) for o in val]
+
+    if isinstance(val, tuple):
+        # object make (func, dict), omit form (class_name, params, dict*), len=2
+        call_class = load_func_by_name(val[0])[0]
+        new_params = {}
+        new_params.update(params)
+        new_params.update(val[-1])
+        return call_class(**new_params)
+
     if isinstance(val, str):
         if val.rsplit('.', 1)[-1][0].isupper():  # this is class, then call to make object
             return load_func_by_name(val)[0](**params)
