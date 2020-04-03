@@ -325,6 +325,8 @@ def data_load_folder(**config):
     :return: None, new_config (None for learner)
     """
     train_load = ImageList.from_folder(config['path'])
+    train_load = train_load.filter_by_func(config['data_helper'].filter_func) \
+        if hasattr(config['data_helper'], 'filter_func') else train_load
     if config.get('valid_pct', None) is None:
         train_load = train_load.split_by_folder(train=config.get('train_folder', 'train'),
                                                 valid=config.get('valid_folder', 'valid'))
@@ -344,12 +346,16 @@ def data_load_folder(**config):
     print('starting load test')
     if config.get('valid_pct', None) is None:
         test_load = ImageList.from_folder(config['path'])
+        test_load = test_load.filter_by_func(config['data_helper'].filter_func) \
+            if hasattr(config['data_helper'], 'filter_func') else test_load
         test_load = test_load.split_by_folder(train=config.get('train_folder', 'train'),
                                               valid=config.get('test_folder', 'test'))
     else:
         # in this case, merge parent folder and just get test
         # to make sure train is not empty and not label filter out in test set
         test_load = ImageList.from_folder(config['test_path'])
+        test_load = test_load.filter_by_func(config['data_helper'].filter_func) \
+            if hasattr(config['data_helper'], 'filter_func') else test_load
         test_load = test_load.split_by_folder(train=config.get('train_folder', 'train'),
                                               valid=config.get('test_folder', 'test'))
 
@@ -486,6 +492,7 @@ def training_simple_2_steps(**config):
     :return: new config
     """
     learn = config['learn']
+    learn.save(config.get('best_name', 'best'))
 
     # for large lr
     lr = config.get('lr', 1e-2)
@@ -515,18 +522,17 @@ def training_adam_sgd(**config):
     data_train, model, layer_groups = config['data_train'], config['model'], config['layer_groups']
 
     # TODO see note in header
-    # resume
-
     learn.save(best_name)  # TODO why need in the newer version of pytorch
 
     learn.data = data_train
 
+    epochs = config.get('epochs', 30)
     lr = config.get('lr', 5e-3)
-    learn.fit_one_cycle(config.get('epochs', 30), max_lr=lr)
+    learn.fit_one_cycle(epochs, max_lr=lr)
 
-    learn.save('best-{}'.format(config.get('epochs', 30)))
+    learn.save('best-{}'.format(epochs))
 
-    torch.save(learn.model.state_dict(), config['cp'] / 'e_{}.w'.format(config.get('epochs', 30)))
+    torch.save(learn.model.state_dict(), config['cp'] / 'e_{}.w'.format(epochs))
     torch.save(learn.model.state_dict(), config['cp'] / 'final.w')
 
     # SGD optimize
@@ -534,14 +540,15 @@ def training_adam_sgd(**config):
     learn = Learner(data_train, model=model, opt_func=opt, metrics=config['metrics'],
                     layer_groups=layer_groups,
                     model_dir=config['cp'])
-    learn.model.load_state_dict(torch.load(config['cp'] / 'e_{}.w'.format(config.get('epochs', 30))))
+    learn.model.load_state_dict(torch.load(config['cp'] / 'e_{}.w'.format(epochs)))
     config['learn'] = learn  # new leaner
 
     config = learn_general_setup(**config)
     learn.data = data_train
 
+    epochs = config.get('epochs_2', epochs)
     lr = config.get('lr_2', lr)
-    learn.fit_one_cycle(config.get('epochs_2', 30), max_lr=lr)
+    learn.fit_one_cycle(epochs, max_lr=lr)
 
     torch.save(learn.model.state_dict(), config['cp'] / 'final.w')
 
