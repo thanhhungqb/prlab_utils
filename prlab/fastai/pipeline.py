@@ -68,6 +68,8 @@ def pipeline_control_multi(**kwargs):
 
     ordered_pipeline_names = ['process_pipeline_{}'.format(i) for i in range(1000) if
                               config.get('process_pipeline_{}'.format(i), None) is not None]
+    # sometime set 'none' instead list to disable it (override json by command line)
+    ordered_pipeline_names = [o for o in ordered_pipeline_names if isinstance(config[o], list)]
     if len(ordered_pipeline_names) == 0:
         # support old version of configure file
         ordered_pipeline_names = ['process_pipeline']
