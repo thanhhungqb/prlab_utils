@@ -38,7 +38,7 @@ def convert_to_obj_or_fn(val, **params):
         # ["object", class_name, dict] reverse for object make (as tuple below)
         # because object is reverse word, and never use to function or class, safe to use here to mark
         if len(val) > 1 and val[0] == "object":
-            return convert_to_obj_or_fn(tuple(val[1:]))
+            return convert_to_obj_or_fn(tuple(val[1:]), **params)
         return [convert_to_obj_or_fn(o, **params) for o in val]
 
     if isinstance(val, tuple):
