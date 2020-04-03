@@ -319,6 +319,7 @@ class NormWeightsAcc:
     """
     refer to `prlab.torch.functions.norm_weights_acc` but in class mode and could modified f_acc
     """
+    __name__ = 'NormWeightsAcc'
 
     def __init__(self, **config):
         second_metrics_fn = config.get('second_metrics_fn', 'fastai.metrics.accuracy')
