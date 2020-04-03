@@ -35,10 +35,14 @@ def convert_to_obj_or_fn(val, **params):
     if isinstance(val, dict):
         return {k: convert_to_obj_or_fn(v, **params) for k, v in val.items()}
     if isinstance(val, list):
+        # ["object", class_name, dict] reverse for object make (as tuple below)
+        # because object is reverse word, and never use to function or class, safe to use here to mark
+        if len(val) > 1 and val[0] == "object":
+            return convert_to_obj_or_fn(tuple(val[1:]))
         return [convert_to_obj_or_fn(o, **params) for o in val]
 
     if isinstance(val, tuple):
-        # object make (func, dict), omit form (class_name, params, dict*), len=2
+        # object make (class_name, dict), omit form (class_name, params, dict*), len=2
         call_class = load_func_by_name(val[0])[0]
         new_params = {}
         new_params.update(params)
