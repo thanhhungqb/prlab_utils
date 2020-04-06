@@ -22,6 +22,7 @@ from sklearn.metrics import confusion_matrix
 from outside.scikit.plot_confusion_matrix import plot_confusion_matrix
 from outside.stn import STN
 from outside.super_resolution.srnet import SRNet3
+from prlab.fastai.image_data import SamplerImageList
 from prlab.fastai.utils import general_configure, base_arch_str_to_obj
 from prlab.fastai.video_data import BalancedLabelImageList
 from prlab.gutils import load_func_by_name, set_if, npy_arr_pretty_print
@@ -326,7 +327,8 @@ def data_load_folder(**config):
     :param config:
     :return: None, new_config (None for learner)
     """
-    train_load = ImageList.from_folder(config['path'])
+    print('starting load train/valid')
+    train_load = SamplerImageList.from_folder(config['path'])
     train_load = train_load.filter_by_func(config['data_helper'].filter_func) \
         if hasattr(config['data_helper'], 'filter_func') else train_load
     if config.get('valid_pct', None) is None:
@@ -339,7 +341,7 @@ def data_load_folder(**config):
         train_load
             .label_from_func(config['data_helper'].y_func, label_cls=config['data_helper'].label_cls)
             .transform(config['tfms'], size=config['img_size'])
-            .databunch(bs=config['bs'])
+            .databunch(bs=config['bs'], sampler_super=config.get('sampler_super', None))
     ).normalize(imagenet_stats)
     config['data_train'], config['data'] = data_train, data_train
     print('data train', data_train)
