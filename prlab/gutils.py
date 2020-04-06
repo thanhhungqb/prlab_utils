@@ -576,9 +576,13 @@ def npy_arr_pretty_print(npy_arr, fm='{:.4f}'):
     """
     if isinstance(npy_arr, (np.float, np.float64, np.int, np.int64)):
         return fm.format(npy_arr)
+    if isinstance(npy_arr, (int, float)):
+        return fm.format(npy_arr)
 
     # else, then array
     arr_out = [npy_arr_pretty_print(o, fm=fm) for o in npy_arr]
+    if not isinstance(npy_arr, np.ndarray):
+        npy_arr = np.array(npy_arr)
     to_print = "\t".join(arr_out) if len(npy_arr.shape) < 2 else "\n".join(arr_out)
     return to_print
 
