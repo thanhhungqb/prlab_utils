@@ -689,6 +689,67 @@ def make_report_cls(**config):
     return config
 
 
+def make_report_general(**config):
+    """
+    Report for regression or some general case, where just forcus on metrics
+    Follow Pipeline Process template.
+    :param config: contains data_test store test in valid mode, tta_times (if have)
+    :return: new config
+    """
+    print('starting report for regression')
+    learn = config['learn']
+    cp = config['cp']
+
+    data_current = learn.data  # make backup of current data of learn
+    if hasattr(learn.model, 'is_testing'):
+        learn.model.is_testing = True
+    learn.data = config['data_test']
+    print(config['data_test'])
+
+    metric_outs, to_save = [], {}
+    metrics = config['metrics']
+    metrics = metrics if isinstance(metrics, list) else [metrics]
+
+    for run_num in range(config.get('tta_times', 3)):
+        ys, y = learn.TTA(ds_type=DatasetType.Valid, scale=config.get('test_scale', 1.10))
+
+        outs = [o(ys, y) for o in metrics]
+
+        print('run', run_num, outs)
+
+        outs = [o.numpy().tolist() for o in outs]
+        to_save['time_{}'.format(run_num)] = {'outs': outs, 'ys': ys.numpy(), 'y': y.numpy()}
+
+        metric_outs.append(outs)
+        tmp_s = npy_arr_pretty_print(np.array(outs))
+        (config['cp'] / "test-out.txt").open('a').write('?: {}\n\n'.format(tmp_s))
+
+    # metric_outs shape [run_num, len(metrics)]
+    outs_npy = np.array(metric_outs)
+    stats = [np.average(outs_npy, axis=1), np.std(outs_npy, axis=1),
+             np.min(outs_npy, axis=1), np.max(outs_npy, axis=1),
+             np.median(outs_npy, axis=1)]
+
+    # accs list of list (1+)
+    metric_outs_str = npy_arr_pretty_print(outs_npy)
+    stats_str = npy_arr_pretty_print(np.array(stats))
+
+    (config['model_path'] / "reports.txt").open('a').write('{}\t{}\n{}\n\n'.format(cp, stats_str, metric_outs_str))
+    print('3 results', stats_str)
+
+    np.save(cp / "results", to_save)
+
+    # roll back for data in learn
+    learn.data = data_current
+    if hasattr(learn.model, 'is_testing'):
+        learn.model.is_testing = False
+
+    return config
+
+
+make_report_regression = make_report_general
+
+
 # *************** WEIGHTS LOAD **********************************
 def srnet3_weights_load(**config):
     """
