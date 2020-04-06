@@ -298,8 +298,6 @@ class SizeGroupedImageDataBunch(ImageDataBunch):
         datasets = cls._init_ds(train_ds, valid_ds, test_ds)
         val_bs = ifnone(val_bs, bs)
 
-        collate_fn = resize_collate  # TODO fix hardcoded use param instead
-
         train_sampler = GroupRandomSampler(datasets[0].x)
         train_dl = DataLoader(datasets[0], batch_size=bs, sampler=train_sampler, drop_last=True,
                               num_workers=num_workers, **dl_kwargs)
