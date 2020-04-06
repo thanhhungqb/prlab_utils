@@ -35,7 +35,7 @@ class ClassBalancedRandomSampler(RandomSampler):
         self.data_helper = data_helper
 
         print('load labels')
-        labels = [data_helper.y_func(item) for item in data_source]
+        labels = [data_helper.y_func(item) for item in data_source.items]
         pos = [o for o in range(len(labels))]
         random.shuffle(pos)
         self.selected_pos = []
