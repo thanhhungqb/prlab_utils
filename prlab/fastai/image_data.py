@@ -19,7 +19,7 @@ class ClassBalancedRandomSampler(RandomSampler):
     """
 
     def __init__(self, data_source, max_samples_each_class, data_helper, replacement=False, **config):
-        # TODO must provide the way to know the label?
+        # must provide the way to know the label?
         self.data_source = data_source
         self.replacement = replacement
         self.max_samples_each_class = max_samples_each_class
@@ -80,7 +80,7 @@ class SamplerSuper:
                             'ex. prlab.fastai.image_data.ClassBalancedRandomSampler')
 
     def __call__(self, data_source, **kwargs):
-        self.make_sampler(data_source, **kwargs)
+        return self.make_sampler(data_source, **kwargs)
 
     def make_sampler(self, data_source, **kwargs):
         params = self.config.copy()
