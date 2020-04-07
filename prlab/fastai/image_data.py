@@ -28,31 +28,33 @@ class ClassBalancedRandomSampler(RandomSampler):
             raise ValueError("replacement should be a boolean value, but got "
                              "replacement={}".format(self.replacement))
 
+        self.data_helper = data_helper
+        self.selected_pos = None
+
+        self.resample()
+
+    def resample(self):
         # select and store all info here (more memory need to store this list, but less complex to implement)
         # Do different for replacement or not
         # TODO now not support replacement
         # n = len(self.data_source)
-        self.data_helper = data_helper
-
-        print('load labels')
-        labels = [data_helper.y_func(item) for item in data_source.items]
+        labels = [self.data_helper.y_func(item) for item in self.data_source.items]
         pos = [o for o in range(len(labels))]
         random.shuffle(pos)
         self.selected_pos = []
-        print('count for each label')
         count_l = {}
         for p in pos:
             label_p = labels[p]
             if count_l.get(label_p, 0) < self.max_samples_each_class:
                 count_l[label_p] = count_l.get(label_p, 0) + 1
                 self.selected_pos.append(p)
-        print('finish one step of balance with', len(self.selected_pos), count_l, self.selected_pos[:10])
 
     @property
     def num_samples(self):
         return len(self.selected_pos)
 
     def __iter__(self):
+        self.resample()
         return iter(self.selected_pos)
 
     def __len__(self):
