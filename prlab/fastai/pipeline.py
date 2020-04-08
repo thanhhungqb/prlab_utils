@@ -350,20 +350,21 @@ def data_load_folder(**config):
 
     # load test to valid to control later, ONLY USE AT TEST STEP
     print('starting load test')
-    if config.get('valid_pct', None) is None:
-        test_load = ImageList.from_folder(config['path'])
-        test_load = test_load.filter_by_func(config['data_helper'].filter_func) \
-            if hasattr(config['data_helper'], 'filter_func') else test_load
-        test_load = test_load.split_by_folder(train=config.get('train_folder', 'train'),
-                                              valid=config.get('test_folder', 'test'))
-    else:
+    if config.get('valid_pct', None) is not None:
         # in this case, merge parent folder and just get test
         # to make sure train is not empty and not label filter out in test set
+        # test_path should be a parent folder of path (or similar meaning)
+        # if training size is big, test_path may simulate training but smaller size to quicker load
         test_load = ImageList.from_folder(config['test_path'])
-        test_load = test_load.filter_by_func(config['data_helper'].filter_func) \
-            if hasattr(config['data_helper'], 'filter_func') else test_load
-        test_load = test_load.split_by_folder(train=config.get('train_folder', 'train'),
-                                              valid=config.get('test_folder', 'test'))
+    elif config.get('is_valid_fn', None) is not None:
+        test_load = ImageList.from_folder(config['test_path'])
+    else:
+        test_load = ImageList.from_folder(config['path'])
+
+    test_load = test_load.filter_by_func(config['data_helper'].filter_func) \
+        if hasattr(config['data_helper'], 'filter_func') else test_load
+    test_load = test_load.split_by_folder(train=config.get('train_folder', 'train'),
+                                          valid=config.get('test_folder', 'test'))
 
     data_test = (
         test_load
