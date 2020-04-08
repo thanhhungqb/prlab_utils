@@ -331,11 +331,13 @@ def data_load_folder(**config):
     train_load = SamplerImageList.from_folder(config['path'])
     train_load = train_load.filter_by_func(config['data_helper'].filter_func) \
         if hasattr(config['data_helper'], 'filter_func') else train_load
-    if config.get('valid_pct', None) is None:
+    if config.get('valid_pct', None) is not None:
+        train_load = train_load.split_by_rand_pct(valid_pct=config['valid_pct'], seed=config.get('seed', None))
+    elif config.get('is_valid_fn', None) is not None:
+        train_load = train_load.split_by_valid_func(config['data_helper'].valid_func)
+    else:
         train_load = train_load.split_by_folder(train=config.get('train_folder', 'train'),
                                                 valid=config.get('valid_folder', 'valid'))
-    else:
-        train_load = train_load.split_by_rand_pct(valid_pct=config['valid_pct'], seed=config.get('seed', None))
 
     data_train = (
         train_load
