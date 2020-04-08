@@ -2,6 +2,7 @@ import copy
 import datetime
 import importlib
 import json
+import random
 import time
 from pathlib import Path
 
@@ -585,6 +586,35 @@ def npy_arr_pretty_print(npy_arr, fm='{:.4f}'):
         npy_arr = np.array(npy_arr)
     to_print = "\t".join(arr_out) if len(npy_arr.shape) < 2 else "\n".join(arr_out)
     return to_print
+
+
+def balanced_sampler(labels: list, n_each=1000, replacement=False):
+    """
+    Balanced Sampler from labels and get n_each for each label kind.
+    :param labels: list of label (int or str)
+    :param n_each:
+    :param replacement:
+    :return: list of idx that sampler
+    """
+    n = len(labels)
+    pos = [o for o in range(n)]
+    random.shuffle(pos)
+    if replacement:
+        # [NOTE: n*3 is a trick]
+        # that seem enough, but in general case should think about infinite this list
+        # but catch when all labels full below
+        # this implement want to keep this simple
+        pos = [random.randint(0, n) for _ in range(n * 3)]
+
+    selected_pos = []
+    count_l = {}
+    for p in pos:
+        label_p = labels[p]
+        if count_l.get(label_p, 0) < n_each:
+            count_l[label_p] = count_l.get(label_p, 0) + 1
+            selected_pos.append(p)
+
+    return selected_pos
 
 
 def test_make_check_point_folder():
