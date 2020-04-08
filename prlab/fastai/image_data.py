@@ -129,8 +129,9 @@ class SamplerImageDataBunch(ImageDataBunch):
         for d, b, s in zip(datasets, (bs, val_bs, val_bs, val_bs), (True, False, False, False)):
             if d is not None:
                 if sampler_super is not None:
-                    sampler = sampler_super(d.x)
-                    dls.append(DataLoader(d, b, sampler=sampler, drop_last=s, num_workers=num_workers, **dl_kwargs))
+                    sampler = sampler_super(d.x) if s else None
+                    params = {'sampler': sampler, 'shuffle': s if sampler is None else False}
+                    dls.append(DataLoader(d, b, **params, drop_last=s, num_workers=num_workers, **dl_kwargs))
                 else:
                     # random for train and sequential for valid/test as default in original of ImageDataBunch
                     dls.append(DataLoader(d, b, shuffle=s, drop_last=s, num_workers=num_workers, **dl_kwargs))
