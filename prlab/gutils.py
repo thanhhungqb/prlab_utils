@@ -2,6 +2,7 @@ import copy
 import datetime
 import importlib
 import json
+import random
 import time
 from pathlib import Path
 
@@ -13,6 +14,9 @@ from sklearn import preprocessing
 
 # add ls function to Path for easy to use
 Path.ls = lambda x: list(x.iterdir())
+
+
+def clean_str(s): return '_'.join(s.split()).replace('/', '')
 
 
 def set_if(d, k, v, check=None):
@@ -28,6 +32,32 @@ def set_if(d, k, v, check=None):
     return d
 
 
+def convert_to_obj_or_fn(val, **params):
+    if isinstance(val, dict):
+        return {k: convert_to_obj_or_fn(v, **params) for k, v in val.items()}
+    if isinstance(val, list):
+        # ["object", class_name, dict] reverse for object make (as tuple below)
+        # because object is reverse word, and never use to function or class, safe to use here to mark
+        if len(val) > 1 and val[0] == "object":
+            return convert_to_obj_or_fn(tuple(val[1:]), **params)
+        return [convert_to_obj_or_fn(o, **params) for o in val]
+
+    if isinstance(val, tuple):
+        # object make (class_name, dict), omit form (class_name, params, dict*), len=2
+        call_class = load_func_by_name(val[0])[0]
+        new_params = {}
+        new_params.update(params)
+        new_params.update(val[-1])
+        return call_class(**new_params)
+
+    if isinstance(val, str):
+        if val.rsplit('.', 1)[-1][0].isupper():  # this is class, then call to make object
+            return load_func_by_name(val)[0](**params)
+        else:
+            return load_func_by_name(val)[0]
+    return val
+
+
 def convert_to_obj(val, **params):
     """
     Convert to function call or object
@@ -38,7 +68,7 @@ def convert_to_obj(val, **params):
     if isinstance(val, dict):
         return {k: convert_to_obj(v, **params) for k, v in val.items()}
     if isinstance(val, (tuple, list)):
-        return [convert_to_obj(o) for o in val]
+        return [convert_to_obj(o, **params) for o in val]
     if isinstance(val, str):
         return load_func_by_name(val)[0](**params)
     return val
@@ -105,6 +135,34 @@ def to_json_writeable(js):
     return str(js)
 
 
+def load_json_text_lines(file_name):
+    """
+    Load text file, each line contains json
+    :param file_name:
+    :return: {line_count: JS}
+    """
+    with open(file_name) as f:
+        lines = f.readlines()
+        out = {}
+        for i, text in enumerate(lines):
+            out[i] = json.loads(text)
+
+    return out
+
+
+def backup_file(file_path, n=0):
+    file_path = file_path if isinstance(file_path, Path) else Path(file_path)
+    if file_path.is_file():
+        next_f = file_path.parent / f'{file_path.name}.{n}'
+        if next_f.is_file():
+            return backup_file(file_path, n + 1)
+        else:
+            file_path.rename(next_f)
+            return next_f
+    else:
+        return None
+
+
 def make_check_point_folder(config={}, cp_base=None, cp_name=None):
     """
     make a checkpoint folder and csv log
@@ -130,6 +188,7 @@ def make_check_point_folder(config={}, cp_base=None, cp_name=None):
     txtwriter = cp_path / 'configure.txt'
     txtwriter.write_text(str(config)) if not txtwriter.is_file() else None
     try:
+        backup_file(cp_path / 'configure.json')  # backup old file in this folder
         with open(cp_path / 'configure.json', 'w') as f:
             json.dump(to_json_writeable(config), f, indent=2)
     except Exception as e:
@@ -447,7 +506,7 @@ def run_k_fold(ctx, run_id, json_conf):
     return out
 
 
-def encode_and_bind(df, features, keep_old=False):
+def encode_and_bind(df, features, keep_old=False, drop_first=False, **kwargs):
     """
     One-hot vector for dataframe
     Credit: https://stackoverflow.com/questions/37292872/how-can-i-one-hot-encode-in-python
@@ -455,18 +514,57 @@ def encode_and_bind(df, features, keep_old=False):
     :param df:
     :param features: str or list(str)
     :param keep_old:
+    :param drop_first: if true then dummies, else one-hot
     :return:
     """
     # if only one feature then could pass as str instead [str]
     if not isinstance(features, list):
         features = [features]
 
-    dummies = [pd.get_dummies(df[[feature]]) for feature in features]
+    dummies = [pd.get_dummies(df[[feature]], drop_first=drop_first) for feature in features]
     new_df = pd.concat([df] + dummies, axis=1)
 
     if not keep_old:
         new_df = new_df.drop(features, axis=1)
 
+    return new_df
+
+
+def column_map(df, feature_names, new_val, keep_old=False, **kwargs):
+    """
+    Mapping column values
+    :param df:
+    :param feature_names: [field_name]
+    :param new_val: {field_name; {val:new_val}, new_val is value or 1-D array, must same length
+    :param keep_old:
+    :param kwargs:
+    :return:
+    """
+    if not isinstance(feature_names, list):
+        feature_names = [feature_names]
+
+    new_df = pd.DataFrame()
+    for field_name in feature_names:
+        print('do for field', field_name)
+        for k, v in new_val[field_name].items():
+            xlen = len(v) if isinstance(v, list) else 1
+            # xlen = len(new_val[field_name])
+        x_names = ['{}_{}'.format(field_name, o) for o in range(xlen)]
+
+        na_value = new_val[field_name]["#na#"]
+        for o in df[field_name]:
+            if new_val[field_name].get(o, None) is None:
+                new_val[field_name][o] = na_value
+
+        df[field_name] = df[field_name].str.strip()
+        col = df[field_name].map(new_val[field_name])
+        col.fillna(pd.Series(na_value), inplace=True)
+
+        new_df[x_names] = pd.DataFrame(col.tolist())
+
+    new_df = pd.concat([df, new_df], axis=1)
+    if not keep_old:
+        new_df = new_df.drop(feature_names, axis=1)
     return new_df
 
 
@@ -479,11 +577,44 @@ def npy_arr_pretty_print(npy_arr, fm='{:.4f}'):
     """
     if isinstance(npy_arr, (np.float, np.float64, np.int, np.int64)):
         return fm.format(npy_arr)
+    if isinstance(npy_arr, (int, float)):
+        return fm.format(npy_arr)
 
     # else, then array
-    arr_out = [npy_arr_pretty_print(o) for o in npy_arr]
+    arr_out = [npy_arr_pretty_print(o, fm=fm) for o in npy_arr]
+    if not isinstance(npy_arr, np.ndarray):
+        npy_arr = np.array(npy_arr)
     to_print = "\t".join(arr_out) if len(npy_arr.shape) < 2 else "\n".join(arr_out)
     return to_print
+
+
+def balanced_sampler(labels: list, n_each=1000, replacement=False):
+    """
+    Balanced Sampler from labels and get n_each for each label kind.
+    :param labels: list of label (int or str)
+    :param n_each:
+    :param replacement:
+    :return: list of idx that sampler
+    """
+    n = len(labels)
+    pos = [o for o in range(n)]
+    random.shuffle(pos)
+    if replacement:
+        # [NOTE: n*3 is a trick]
+        # that seem enough, but in general case should think about infinite this list
+        # but catch when all labels full below
+        # this implement want to keep this simple
+        pos = [random.randint(0, n) for _ in range(n * 3)]
+
+    selected_pos = []
+    count_l = {}
+    for p in pos:
+        label_p = labels[p]
+        if count_l.get(label_p, 0) < n_each:
+            count_l[label_p] = count_l.get(label_p, 0) + 1
+            selected_pos.append(p)
+
+    return selected_pos
 
 
 def test_make_check_point_folder():

@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from prlab.gutils import load_func_by_name
+
 
 class PassThrough(nn.Module):
     """
@@ -13,6 +15,131 @@ class PassThrough(nn.Module):
 
     def forward(self, *input, **kwargs):
         return input[0]
+
+
+class ExLoss(nn.Module):
+    """
+    Just extend to allow any params
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__()
+
+
+class WrapLoss(nn.Module):
+    """
+    To wrap some loss does not support **kwargs
+    from `torch.nn.modules.loss._Loss`
+    """
+    _wrap = None
+
+    def __init__(self, **kwargs):
+        super().__init__()
+        if self._wrap is not None:
+            self._obj = self._wrap(reduction=kwargs.get('reduction', 'mean'))
+
+    def __call__(self, pred, target, *args, **kwargs):
+        if self._obj is not None:
+            return self._obj(pred, target, **kwargs)
+
+
+class MSELossE(WrapLoss):
+    _wrap = nn.MSELoss
+
+
+def prob_weights_loss(pred, target, **kwargs):
+    """
+    `CrossEntropyLoss` but for multi branches (out, weight) :([bs, C, branches], [bs, branches])
+    :param pred:
+    :param target:
+    :param kwargs:
+    :return:
+    """
+    f_loss, _ = load_func_by_name('prlab.fastai.utils.prob_loss_raw')
+    if not isinstance(pred, tuple):
+        return f_loss(pred, target)
+
+    out, _ = pred
+    n_branches = out.size()[-1]
+    losses = [f_loss(out[:, :, i], target) for i in range(n_branches)]
+
+    losses = torch.stack(losses, dim=-1)
+    # loss = (losses * weights).sum(dim=-1)
+    loss = torch.mean(losses, dim=-1)
+    return torch.mean(loss)
+
+
+def weights_branches(pred, **kwargs):
+    """
+    Use together with `prlab.model.pyramid_sr.prob_weights_loss`
+    :param pred: out, weights: [bs, n_classes, n_branches] [bs, n_branches]
+    :param kwargs:
+    :return:
+    """
+    if not isinstance(pred, tuple):
+        # if not tuple then return the final/weighted version => DO NOTHING
+        return pred
+
+    out, _ = pred
+
+    n_branches = out.size()[-1]
+    sm = [torch.softmax(out[:, :, i], dim=1) for i in range(n_branches)]
+    sm = torch.stack(sm, dim=-1)
+    # c_out = torch.bmm(sm, weights.unsqueeze(-1)).squeeze(dim=-1)
+    c_out = torch.mean(sm, dim=-1)
+
+    return c_out
+
+
+def prob_weights_acc(pred, target, **kwargs):
+    """
+    Use together with `prlab.model.pyramid_sr.prob_weights_loss`
+    :param pred: out, weights: [bs, n_classes, n_branches] [bs, n_branches]
+    :param target: int for one-hot and list of float for prob
+    :param kwargs:
+    :return:
+    """
+    f_acc, _ = load_func_by_name('prlab.fastai.utils.prob_acc')
+    c_out = weights_branches(pred=pred)
+
+    return f_acc(c_out, target)  # f_acc(pred[0][:, :, 0], target)
+
+
+def norm_weights_loss(pred, target, **kwargs):
+    """
+    `CrossEntropyLoss` but for multi branches (out, weight) :([bs, C, branches], [bs, branches])
+    :param pred:
+    :param target:
+    :param kwargs:
+    :return:
+    """
+    # f_loss, _ = load_func_by_name('prlab.fastai.utils.prob_loss_raw')
+    f_loss = nn.CrossEntropyLoss()
+    if not isinstance(pred, tuple):
+        return f_loss(pred, target)
+
+    out, _ = pred
+    n_branches = out.size()[-1]
+    losses = [f_loss(out[:, :, i], target) for i in range(n_branches)]
+
+    losses = torch.stack(losses, dim=-1)
+    # loss = (losses * weights).sum(dim=-1)
+    loss = torch.mean(losses, dim=-1)
+    return torch.mean(loss)
+
+
+def norm_weights_acc(pred, target, **kwargs):
+    """
+    Use together with `prlab.model.pyramid_sr.prob_weights_loss`
+    :param pred: out, weights: [bs, n_classes, n_branches] [bs, n_branches]
+    :param target: int for one-hot and list of float for prob
+    :param kwargs:
+    :return:
+    """
+    f_acc, _ = load_func_by_name('fastai.metrics.accuracy')
+    c_out = weights_branches(pred=pred)
+
+    return f_acc(c_out, target)  # f_acc(pred[0][:, :, 0], target)
 
 
 def make_theta_from_st(st, is_inverse=False):
@@ -104,6 +231,7 @@ def fc_more_label(fc, n_label=1):
     """
     extend some row (more labels) for fc in pytorch
     :param fc:
+    :param n_label: number of labels to add, default is 1
     :return:
     """
     o_label = fc.weight.size()[0]
@@ -119,6 +247,62 @@ def fc_more_label(fc, n_label=1):
     new_fc.bias.data[:] = F.pad(b, (0, 1), "constant", 0)
 
     return new_fc
+
+
+def fc_cut_label(fc, n_label=1, in_place=False):
+    """
+    cut some row (less labels) for fc in pytorch. Note: careful with the order, will cut the latest
+    If the order not correct, call `fc_exchange_label` before call this function
+    :param fc:
+    :param n_label: number of labels to remove, default is 1
+    :param in_place:
+    :return:
+    """
+    o_label = fc.weight.size()[0]
+    n_label_size = o_label - n_label
+
+    new_fc = nn.Linear(fc.weight.size()[1], n_label_size)
+
+    w, b = fc.weight, fc.bias
+
+    new_fc.weight.data.copy_(w[:n_label_size, :])
+    new_fc.bias.data.copy_(b[:n_label_size])
+
+    if in_place:
+        fc.weight, fc.bias = new_fc.weight, new_fc.bias
+        return fc
+    else:
+        return new_fc
+
+
+def fc_exchange_label(fc, new_pos=None, in_place=False):
+    """
+    exchange some label order with new_pos given
+    the new labels size may be differ from old, in case greater, try to fill new_pos with some
+    repeat to make sure the size, [0, 2, 1, 4, 3, 0, 0, 0...]
+    :param fc:
+    :param new_pos:
+    :param in_place: if do in current fc
+    :return:
+    """
+    if new_pos is None:  # keep current order, do nothing
+        return fc
+
+    new_fc = nn.Linear(fc.weight.size()[1], len(new_pos))
+
+    # reorder step
+    w = [fc.weight[pos] for pos in new_pos]
+    b = [fc.bias[pos] for pos in new_pos]
+    w, b = torch.stack(w, dim=0), torch.stack(b)
+
+    if in_place:
+        # fc.weight.data.copy_(w), fc.bias.data.copy_(b)
+        new_fc.weight.data.copy_(w), new_fc.bias.data.copy_(b)
+        fc.weight, fc.bias = new_fc.weight, new_fc.bias
+        return fc
+    else:
+        new_fc.weight.data.copy_(w), new_fc.bias.data.copy_(b)
+        return new_fc
 
 # # We want to crop a 80x80 image randomly for our batch
 # # Building central crop of 80 pixel size

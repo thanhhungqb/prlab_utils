@@ -8,15 +8,19 @@ import numpy as np
 import torch
 from fastai import callbacks
 from fastai.basic_data import DatasetType
+from fastai.basic_train import Learner
+from fastai.callback import Callback
 from fastai.callbacks import SaveModelCallback, CSVLogger
-from fastai.metrics import top_k_accuracy, accuracy, MetricsList
-from fastai.train import ClassificationInterpretation, Learner, Callback, Tensor
+from fastai.metrics import top_k_accuracy, accuracy
+from fastai.torch_core import MetricsList
+from fastai.train import ClassificationInterpretation
 from fastai.vision import imagenet_stats, get_transforms, models
 from torch.autograd import Variable
 from torch.nn.functional import log_softmax
 
 from outside.scikit.plot_confusion_matrix import plot_confusion_matrix
-from prlab.gutils import convert_to_obj, convert_to_fn, make_check_point_folder
+from prlab.gutils import convert_to_obj, make_check_point_folder, convert_to_obj_or_fn, load_func_by_name
+from prlab.torch.functions import ExLoss, weights_branches
 
 
 def freeze_layer(x, flag=True):
@@ -175,7 +179,7 @@ class DataArgCallBack(Callback):
         self.transform_size = transform_size
         self.normalize = normalize
 
-    def on_epoch_end(self, epoch: int, smooth_loss: Tensor, last_metrics: MetricsList, **kwargs: Any) -> bool:
+    def on_epoch_end(self, epoch: int, smooth_loss: torch.Tensor, last_metrics: MetricsList, **kwargs: Any) -> bool:
         # do with data
         n_data = (self.src
                   .label_from_func(self.label_func)
@@ -243,6 +247,59 @@ def prob_loss(input, target, **kwargs):
     return torch.mean(prob_loss_raw(input, target, **kwargs))
 
 
+class SoftLoss(torch.nn.Module):
+    """
+    For soft loss (not one-hot but softer) with alpha default 0.9.
+    Similar to `torch.nn.CrossEntropyLoss` but now with softer
+    """
+
+    def __init__(self, alpha=0.9, reduction='mean', **kwargs):
+        super().__init__()
+        self.alpha = alpha
+        self.reduction = reduction
+        self.emb = None
+
+    def forward(self, pred, target):
+        if self.emb is None:
+            self.emb = torch.eye(pred.size()[-1]).to(target.device)
+        t = torch.embedding(self.emb, target)
+        soft_part = torch.ones_like(t)
+        l_softmax = log_softmax(pred, 1)
+        out = -t * l_softmax * self.alpha - soft_part * l_softmax * (1 - self.alpha)
+        if self.reduction == 'mean':
+            return torch.mean(out)
+        return torch.sum(out)
+
+
+class NormWeightsLoss(ExLoss):
+    """
+    Similar to `prlab.model.pyramid_sr.norm_weights_loss` but could configure the second loss func
+    """
+
+    def __init__(self, second_loss_fn=None, **kwargs):
+        print('run in NormWeightsLoss')
+        super().__init__()
+        self.f_loss = torch.nn.CrossEntropyLoss()  # default
+        # TODO fix if second_loss_fn not support kwargs
+        if second_loss_fn:
+            self.f_loss = convert_to_obj_or_fn(second_loss_fn, **kwargs)
+            print('use second loss', self.f_loss)
+
+    def forward(self, pred, target, **kwargs):
+        if not isinstance(pred, tuple):
+            return self.f_loss(pred, target)
+
+        out, _ = pred
+        n_branches = out.size()[-1]
+        losses = [self.f_loss(out[:, :, i], target) for i in range(n_branches)]
+
+        losses = torch.stack(losses, dim=-1)
+        # loss = (losses * weights).sum(dim=-1)
+
+        loss = torch.mean(losses, dim=-1)
+        return torch.mean(loss)
+
+
 def prob_acc(pred, target, **kwargs):
     """
     accuracy when y input as raw probability instead a int number
@@ -256,6 +313,24 @@ def prob_acc(pred, target, **kwargs):
 
 def joint_acc(preds, target, **kwargs):
     return accuracy(preds[0], target)
+
+
+class NormWeightsAcc:
+    """
+    refer to `prlab.torch.functions.norm_weights_acc` but in class mode and could modified f_acc
+    """
+    __name__ = 'NormWeightsAcc'
+
+    def __init__(self, part=-1, **config):
+        second_metrics_fn = config.get('second_metrics_fn', 'fastai.metrics.accuracy')
+        self.part = part
+        self.f_acc, _ = load_func_by_name(second_metrics_fn)
+
+    def __call__(self, pred, target, *args, **kwargs):
+        c_out = weights_branches(pred=pred)
+        if self.part >= 0:
+            return self.f_acc(c_out[:, self.part], target[:, self.part])
+        return self.f_acc(c_out, target)
 
 
 def make_one_hot(labels, C=2):
@@ -404,16 +479,13 @@ def general_configure(**config):
     config['path'] = Path(config['path'])
     config['model_path'] = Path(config['model_path'])
 
+    cp, best_name, csv_log = make_check_point_folder(config, None, config['run'])
     loss_func = config.get('loss_func', None)
     config.update({
         'data_helper': convert_to_obj(config.get('data_helper', None), **config),
-        'metrics': convert_to_fn(config.get('metrics', None), **config),
-        'loss_func': convert_to_fn(loss_func, **config) if isinstance(loss_func, str) else loss_func,
+        'metrics': convert_to_obj_or_fn(config.get('metrics', None), **config),
+        'loss_func': convert_to_obj_or_fn(loss_func, **config) if isinstance(loss_func, str) else loss_func,
         'tfms': get_transforms_wrap(xtra_tfms=[], **config),
-    })
-
-    cp, best_name, csv_log = make_check_point_folder(config, None, config['run'])
-    config.update({
         'callback_fn': lambda: get_callbacks(best_name=best_name, csv_filename=csv_log),
     })
     print(cp)

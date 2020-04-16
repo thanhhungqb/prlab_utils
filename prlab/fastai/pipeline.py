@@ -22,9 +22,11 @@ from sklearn.metrics import confusion_matrix
 from outside.scikit.plot_confusion_matrix import plot_confusion_matrix
 from outside.stn import STN
 from outside.super_resolution.srnet import SRNet3
+from prlab.fastai.image_data import SamplerImageList
 from prlab.fastai.utils import general_configure, base_arch_str_to_obj
 from prlab.fastai.video_data import BalancedLabelImageList
 from prlab.gutils import load_func_by_name, set_if, npy_arr_pretty_print
+from prlab.torch.functions import fc_exchange_label
 
 
 def pipeline_control(**kwargs):
@@ -67,6 +69,8 @@ def pipeline_control_multi(**kwargs):
 
     ordered_pipeline_names = ['process_pipeline_{}'.format(i) for i in range(1000) if
                               config.get('process_pipeline_{}'.format(i), None) is not None]
+    # sometime set 'none' instead list to disable it (override json by command line)
+    ordered_pipeline_names = [o for o in ordered_pipeline_names if isinstance(config[o], list)]
     if len(ordered_pipeline_names) == 0:
         # support old version of configure file
         ordered_pipeline_names = ['process_pipeline']
@@ -323,34 +327,44 @@ def data_load_folder(**config):
     :param config:
     :return: None, new_config (None for learner)
     """
-    train_load = ImageList.from_folder(config['path'])
-    if config.get('valid_pct', None) is None:
+    print('starting load train/valid')
+    train_load = SamplerImageList.from_folder(config['path'])
+    train_load = train_load.filter_by_func(config['data_helper'].filter_func) \
+        if hasattr(config['data_helper'], 'filter_func') else train_load
+    if config.get('valid_pct', None) is not None:
+        train_load = train_load.split_by_rand_pct(valid_pct=config['valid_pct'], seed=config.get('seed', None))
+    elif config.get('is_valid_fn', None) is not None:
+        train_load = train_load.split_by_valid_func(config['data_helper'].valid_func)
+    else:
         train_load = train_load.split_by_folder(train=config.get('train_folder', 'train'),
                                                 valid=config.get('valid_folder', 'valid'))
-    else:
-        train_load = train_load.split_by_rand_pct(valid_pct=config['valid_pct'], seed=config.get('seed', None))
 
     data_train = (
         train_load
             .label_from_func(config['data_helper'].y_func, label_cls=config['data_helper'].label_cls)
             .transform(config['tfms'], size=config['img_size'])
-            .databunch(bs=config['bs'])
+            .databunch(bs=config['bs'], sampler_super=config.get('sampler_super', None))
     ).normalize(imagenet_stats)
     config['data_train'], config['data'] = data_train, data_train
     print('data train', data_train)
 
     # load test to valid to control later, ONLY USE AT TEST STEP
     print('starting load test')
-    if config.get('valid_pct', None) is None:
-        test_load = ImageList.from_folder(config['path'])
-        test_load = test_load.split_by_folder(train=config.get('train_folder', 'train'),
-                                              valid=config.get('test_folder', 'test'))
-    else:
+    if config.get('valid_pct', None) is not None:
         # in this case, merge parent folder and just get test
         # to make sure train is not empty and not label filter out in test set
+        # test_path should be a parent folder of path (or similar meaning)
+        # if training size is big, test_path may simulate training but smaller size to quicker load
         test_load = ImageList.from_folder(config['test_path'])
-        test_load = test_load.split_by_folder(train=config.get('train_folder', 'train'),
-                                              valid=config.get('test_folder', 'test'))
+    elif config.get('is_valid_fn', None) is not None:
+        test_load = ImageList.from_folder(config['test_path'])
+    else:
+        test_load = ImageList.from_folder(config['path'])
+
+    test_load = test_load.filter_by_func(config['data_helper'].filter_func) \
+        if hasattr(config['data_helper'], 'filter_func') else test_load
+    test_load = test_load.split_by_folder(train=config.get('train_folder', 'train'),
+                                          valid=config.get('test_folder', 'test'))
 
     data_test = (
         test_load
@@ -485,6 +499,7 @@ def training_simple_2_steps(**config):
     :return: new config
     """
     learn = config['learn']
+    learn.save(config.get('best_name', 'best'))
 
     # for large lr
     lr = config.get('lr', 1e-2)
@@ -492,7 +507,7 @@ def training_simple_2_steps(**config):
     learn.fit_one_cycle(epochs, max_lr=lr)
 
     # smaller lr, if not given then lr/10
-    lr_2 = config.get('lr_2', lr / 10)
+    lr_2 = config.get('lr_2', lr)
     epochs_2 = config.get('epochs_2', epochs)
     learn.fit_one_cycle(epochs_2, max_lr=lr_2)
 
@@ -514,18 +529,17 @@ def training_adam_sgd(**config):
     data_train, model, layer_groups = config['data_train'], config['model'], config['layer_groups']
 
     # TODO see note in header
-    # resume
-
     learn.save(best_name)  # TODO why need in the newer version of pytorch
 
     learn.data = data_train
 
+    epochs = config.get('epochs', 30)
     lr = config.get('lr', 5e-3)
-    learn.fit_one_cycle(config.get('epochs', 30), max_lr=lr)
+    learn.fit_one_cycle(epochs, max_lr=lr)
 
-    learn.save('best-{}'.format(config.get('epochs', 30)))
+    learn.save('best-{}'.format(epochs))
 
-    torch.save(learn.model.state_dict(), config['cp'] / 'e_{}.w'.format(config.get('epochs', 30)))
+    torch.save(learn.model.state_dict(), config['cp'] / 'e_{}.w'.format(epochs))
     torch.save(learn.model.state_dict(), config['cp'] / 'final.w')
 
     # SGD optimize
@@ -533,14 +547,15 @@ def training_adam_sgd(**config):
     learn = Learner(data_train, model=model, opt_func=opt, metrics=config['metrics'],
                     layer_groups=layer_groups,
                     model_dir=config['cp'])
-    learn.model.load_state_dict(torch.load(config['cp'] / 'e_{}.w'.format(config.get('epochs', 30))))
+    learn.model.load_state_dict(torch.load(config['cp'] / 'e_{}.w'.format(epochs)))
     config['learn'] = learn  # new leaner
 
     config = learn_general_setup(**config)
     learn.data = data_train
 
-    lr = config.get('lr_2', 1e-4)
-    learn.fit_one_cycle(config.get('epochs_2', 30), max_lr=lr)
+    epochs = config.get('epochs_2', epochs)
+    lr = config.get('lr_2', lr)
+    learn.fit_one_cycle(epochs, max_lr=lr)
 
     torch.save(learn.model.state_dict(), config['cp'] / 'final.w')
 
@@ -619,6 +634,16 @@ def make_report_cls(**config):
         learn.model.is_testing = True
     learn.data = config['data_test']
     print(config['data_test'])
+    if hasattr(config['data_test'], 'classes') and config['data_test'].classes is not None:
+        classes = np.array(config['data_test'].classes)
+    else:
+        classes = np.array(config.get('label_names', None))
+
+    # when we want to override classes in data_test to another from configure, one flag need
+    if config.get('replace_classes', False):
+        classes = np.array(config.get('label_names', None))
+
+    print('classes (order)', classes)
 
     accs, f1s, to_save = [], [], {}
     uas = []
@@ -636,7 +661,7 @@ def make_report_cls(**config):
         print('run', run_num, accs[-1], 'f1', f1)
 
         _, fig = plot_confusion_matrix(y_labels, ys_labels,
-                                       classes=config.get('label_names', None),
+                                       classes=classes,
                                        normalize=config.get('normalize_cm', True),
                                        title='Confusion matrix')
         fig.savefig(cp / 'run-{}.png'.format(run_num))
@@ -667,6 +692,67 @@ def make_report_cls(**config):
         learn.model.is_testing = False
 
     return config
+
+
+def make_report_general(**config):
+    """
+    Report for regression or some general case, where just forcus on metrics
+    Follow Pipeline Process template.
+    :param config: contains data_test store test in valid mode, tta_times (if have)
+    :return: new config
+    """
+    print('starting report for regression')
+    learn = config['learn']
+    cp = config['cp']
+
+    data_current = learn.data  # make backup of current data of learn
+    if hasattr(learn.model, 'is_testing'):
+        learn.model.is_testing = True
+    learn.data = config['data_test']
+    print(config['data_test'])
+
+    metric_outs, to_save = [], {}
+    metrics = config['metrics']
+    metrics = metrics if isinstance(metrics, list) else [metrics]
+
+    for run_num in range(config.get('tta_times', 3)):
+        ys, y = learn.TTA(ds_type=DatasetType.Valid, scale=config.get('test_scale', 1.10))
+
+        outs = [o(ys, y) for o in metrics]
+
+        print('run', run_num, outs)
+
+        outs = [o.numpy().tolist() for o in outs]
+        to_save['time_{}'.format(run_num)] = {'outs': outs, 'ys': ys.numpy(), 'y': y.numpy()}
+
+        metric_outs.append(outs)
+        tmp_s = npy_arr_pretty_print(np.array(outs))
+        (config['cp'] / "test-out.txt").open('a').write('?: {}\n\n'.format(tmp_s))
+
+    # metric_outs shape [run_num, len(metrics)]
+    outs_npy = np.array(metric_outs)
+    stats = [np.average(outs_npy, axis=1), np.std(outs_npy, axis=1),
+             np.min(outs_npy, axis=1), np.max(outs_npy, axis=1),
+             np.median(outs_npy, axis=1)]
+
+    # accs list of list (1+)
+    metric_outs_str = npy_arr_pretty_print(outs_npy)
+    stats_str = npy_arr_pretty_print(np.array(stats))
+
+    (config['model_path'] / "reports.txt").open('a').write('{}\t{}\n{}\n\n'.format(cp, stats_str, metric_outs_str))
+    print('3 results', stats_str)
+
+    np.save(cp / "results", to_save)
+
+    # roll back for data in learn
+    learn.data = data_current
+    if hasattr(learn.model, 'is_testing'):
+        learn.model.is_testing = False
+
+    return config
+
+
+make_report_regression = make_report_general
 
 
 # *************** WEIGHTS LOAD **********************************
@@ -706,6 +792,7 @@ def resume_learner(**config):
     :param config:
     :return:
     """
+    print('resume step')
     learn = config['learn']
     best_name = config.get('best_name', 'best')
 
@@ -791,6 +878,42 @@ def base_weights_load(**config):
     out = learn.model[-1].load_state_dict(torch.load(base_weights_path), strict=False)
     print('load base weight {} status'.format(config['base_arch']), out)
 
+    return config
+
+
+def exchange_fc(**config):
+    """
+    load weights and update order of label (fc layer at the latest)
+    Must provide:
+        new_pos, if none then no exchange, e.g. [1, 0, 2, 3, 4, 5, 6, 7]
+    LOAD BEFORE MODEL LOAD/RESUME/BUILD
+    :return: update base_weights_path
+    """
+    print("Do the FC exchange for label order change")
+    print('new order', config.get('new_pos', None))
+    base_arch = base_arch_str_to_obj(config.get('base_arch', 'vgg16_bn'))
+
+    base_weights_path = config.get('base_weights_path', None)
+    base_model = create_cnn_model(base_arch=base_arch, nc=config['n_classes'])
+    if base_weights_path is not None and Path(base_weights_path).is_file():
+        state_dict = torch.load(base_weights_path)
+
+        two_latest_keys = list(state_dict.keys())[-2:]
+        stored_lbl_size = state_dict[two_latest_keys[-1]].size()[0]
+        if stored_lbl_size != config['n_classes']:
+            base_model = create_cnn_model(base_arch=base_arch, nc=stored_lbl_size)
+
+        o = base_model.load_state_dict(state_dict=state_dict, strict=False)
+        print('load weights to exchange from ', base_weights_path, o)
+
+    fc_here = base_model[-1]
+    if isinstance(fc_here, nn.Sequential):
+        fc_here = fc_here[-1]
+    fc_exchange_label(fc_here, config.get('new_pos', None), in_place=True)
+    save_to = config.get('base_weights_path_transfer', '/tmp/{}.w'.format(config.get('base_arch', 'vgg16_bn')))
+    torch.save(base_model.state_dict(), save_to)
+
+    config['base_weights_path'] = save_to
     return config
 
 
