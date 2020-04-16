@@ -9,3 +9,5 @@ ferlbl2id = {val: pos for pos, val in enumerate(ferlabels)}
 emowlabels = ['Neutral', 'Happy', 'Surprise', 'Sad', 'Angry', 'Disgust', 'Fear']
 emowlabels = [o.lower() for o in emowlabels]
 emowlbl2id = {val: pos for pos, val in enumerate(emowlabels)}
+
+affect_net_labels = ['Neutral', 'Happy', 'Sad', 'Surprise', 'Fear', 'Disgust', 'Anger', 'Contempt']
