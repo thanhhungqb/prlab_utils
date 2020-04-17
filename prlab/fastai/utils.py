@@ -243,6 +243,17 @@ def prob_loss_raw(pred, target, **kwargs):
     return a
 
 
+class ProbLossRaw(torch.nn.Module):
+    def __init__(self, alpha=0.9, reduction='mean', **kwargs):
+        super().__init__()
+        self.alpha = alpha
+        self.reduction = reduction
+        self.emb = None
+
+    def forward(self, pred, target):
+        return prob_loss_raw(pred=pred, target=target)
+
+
 def prob_loss(input, target, **kwargs):
     return torch.mean(prob_loss_raw(input, target, **kwargs))
 
