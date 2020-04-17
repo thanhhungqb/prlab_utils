@@ -142,6 +142,28 @@ def norm_weights_acc(pred, target, **kwargs):
     return f_acc(c_out, target)  # f_acc(pred[0][:, :, 0], target)
 
 
+class WeightsAcc:
+    """
+    More general than `norm_weights_acc` and `prob_weights_acc`.
+    Can set the base function
+    """
+
+    def __init__(self, base_acc=None, **kwargs):
+        super().__init__()
+
+        acc_default_fn, _ = load_func_by_name('fastai.metrics.accuracy')
+        if base_acc is None:
+            self.base_acc = acc_default_fn
+        else:
+            self.base_acc = load_func_by_name(base_acc)[0] \
+                if isinstance(base_acc, str) else base_acc
+
+    def __call__(self, pred, target, **kwargs):
+        c_out = weights_branches(pred=pred)
+
+        return self.base_acc(c_out, target)
+
+
 def make_theta_from_st(st, is_inverse=False):
     """
     ST without rotate
