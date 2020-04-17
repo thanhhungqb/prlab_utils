@@ -392,7 +392,7 @@ def data_load_folder_df(**config):
         ImageList.from_folder(data_helper.path)
             .filter_by_func(data_helper.filter_train_fn)
             .split_by_valid_func(data_helper.split_valid_fn)
-            .label_from_func(data_helper.y_func)
+            .label_from_func(data_helper.y_func, label_cls=config['data_helper'].label_cls)
             .transform(config['tfms'], size=config['img_size'])
             .databunch(bs=config['bs'])
     ).normalize(imagenet_stats)
@@ -401,7 +401,7 @@ def data_load_folder_df(**config):
     data_test = (
         ImageList.from_folder(data_helper.path)
             .split_by_valid_func(data_helper.filter_test_fn)
-            .label_from_func(data_helper.y_func)
+            .label_from_func(data_helper.y_func, label_cls=config['data_helper'].label_cls)
             .transform(config['tfms'], size=config['img_size'])
             .databunch(bs=config['bs'])
     ).normalize(imagenet_stats)
