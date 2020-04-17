@@ -637,7 +637,7 @@ def make_report_cls(**config):
     if hasattr(config['data_test'], 'classes') and config['data_test'].classes is not None:
         classes = np.array(config['data_test'].classes)
     else:
-        classes = np.array(config.get('label_names', None))
+        classes = np.array(config['label_names']) if config.get('label_names', None) is not None else None
 
     # when we want to override classes in data_test to another from configure, one flag need
     if config.get('replace_classes', False):
