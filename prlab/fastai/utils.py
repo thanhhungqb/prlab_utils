@@ -202,6 +202,19 @@ def get_callbacks(best_name='best', monitor='valid_loss', csv_filename='log', cs
     return out
 
 
+# Loss functions/class
+def do_reduction(loss_tensor, reduction='mean'):
+    """
+    reduction that use in most loss function
+    :param loss_tensor:
+    :param reduction: str => none (None), mean, sum
+    :return: out with reduction
+    """
+    if isinstance(reduction, str) and hasattr(loss_tensor, reduction):
+        loss_tensor = getattr(loss_tensor, reduction)()
+    return loss_tensor
+
+
 def dificult_weight_loss(pred, target, *args, **kwargs):
     """
     loss = - 1 * log(pi) * (pj/pi), where pj is max(p_)
@@ -243,15 +256,20 @@ def prob_loss_raw(pred, target, **kwargs):
     return a
 
 
-class ProbLossRaw(torch.nn.Module):
-    def __init__(self, alpha=0.9, reduction='mean', **kwargs):
+class ProbLoss(torch.nn.Module):
+    def __init__(self, reduction='mean', **kwargs):
         super().__init__()
-        self.alpha = alpha
         self.reduction = reduction
-        self.emb = None
 
     def forward(self, pred, target):
-        return prob_loss_raw(pred=pred, target=target)
+        out = prob_loss_raw(pred=pred, target=target)
+        return do_reduction(out, reduction=self.reduction)
+
+
+class ProbLossRaw(ProbLoss):
+    def __init__(self, **kwargs):
+        kwargs['reduction'] = 'none'
+        super().__init__(**kwargs)
 
 
 def prob_loss(input, target, **kwargs):
@@ -277,20 +295,58 @@ class SoftLoss(torch.nn.Module):
         soft_part = torch.ones_like(t)
         l_softmax = log_softmax(pred, 1)
         out = -t * l_softmax * self.alpha - soft_part * l_softmax * (1 - self.alpha)
-        if self.reduction == 'mean':
-            return torch.mean(out)
-        return torch.sum(out)
+
+        return do_reduction(out, reduction=self.reduction)
+
+
+class DistCutOffLoss(torch.nn.Module):
+    """
+    Use cross entropy loss but with the prior distribution and cut off for correct label
+    ref to `torch.nn.CrossEntropyLoss`
+    input pred [n_label] x target [n_label] (target is not in one-hot, it in form of distribution)
+    lbl_correct = correct label = argmax(target)
+    if pred[lbl_correct] >= target[lbl_correct] => loss = 0
+    else: loss = cel(pred, target)
+    reduction most of time is mean, sometime none if use inside of another loss that need raw.
+    See `torch.nn.modules.loss._Loss`
+    """
+
+    def __init__(self, reduction='mean', **kwargs):
+        super().__init__()
+        self.reduction = reduction
+
+    def forward(self, pred, target):
+        # calc cross entropy in raw mode (return [bs])
+        out = prob_loss_raw(pred=pred, target=target)
+
+        # calc weight, 0 or 1 only, no grad
+        with torch.no_grad():
+            lbl_correct = target.argmax(dim=-1)
+            c_pred, c_target = pred[:, lbl_correct], target[:, lbl_correct]
+            zeros, ones = torch.zeros(1), torch.ones(1)
+            # [bs] which 0 or 1
+            weighted = torch.where(c_pred < c_target, ones, zeros)
+        out = out * weighted
+
+        return do_reduction(out, reduction=self.reduction)
+
+
+class DistCutOffLossRaw(DistCutOffLoss):
+    def __init__(self, **kwargs):
+        kwargs['reduction'] = 'none'  # just set none to return raw
+        super().__init__(**kwargs)
 
 
 class NormWeightsLoss(ExLoss):
     """
     Similar to `prlab.model.pyramid_sr.norm_weights_loss` but could configure the second loss func
+    Note that the second loss func/obj must in raw (not reduction)
     """
 
     def __init__(self, second_loss_fn=None, **kwargs):
         print('run in NormWeightsLoss')
         super().__init__()
-        self.f_loss = torch.nn.CrossEntropyLoss()  # default
+        self.f_loss = torch.nn.CrossEntropyLoss(reduction='none')  # default
         # TODO fix if second_loss_fn not support kwargs
         if second_loss_fn:
             self.f_loss = convert_to_obj_or_fn(second_loss_fn, **kwargs)
