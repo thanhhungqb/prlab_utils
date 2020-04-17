@@ -276,9 +276,9 @@ def prob_loss(input, target, **kwargs):
     return torch.mean(prob_loss_raw(input, target, **kwargs))
 
 
-class SoftLoss(torch.nn.Module):
+class LabelSmoothingLoss1(torch.nn.Module):
     """
-    For soft loss (not one-hot but softer) with alpha default 0.9.
+    For Label Smoothing loss (not one-hot but softer) with alpha default 0.9.
     Similar to `torch.nn.CrossEntropyLoss` but now with softer
     """
 
@@ -297,6 +297,9 @@ class SoftLoss(torch.nn.Module):
         out = -t * l_softmax * self.alpha - soft_part * l_softmax * (1 - self.alpha)
 
         return do_reduction(out, reduction=self.reduction)
+
+
+SoftLoss = LabelSmoothingLoss1  # for old reference
 
 
 class DistCutOffLoss(torch.nn.Module):
