@@ -276,10 +276,39 @@ def prob_loss(input, target, **kwargs):
     return torch.mean(prob_loss_raw(input, target, **kwargs))
 
 
+class LabelSmoothingLoss(torch.nn.Module):
+    """
+    For Label Smoothing loss (not one-hot but softer) with alpha default 0.9.
+    Similar to `prlab.fastai.utils.LabelSmoothingLoss1` but fix the hs of 1-alpha part and safer i_mtx
+    pred: [bs, lbl_size], target: [bs]
+    """
+
+    def __init__(self, alpha=0.9, reduction='mean', **kwargs):
+        super().__init__()
+        self.alpha = alpha
+        self.reduction = reduction
+
+    def forward(self, pred, target):
+        lbl_size = pred.size()[-1]
+        i_mtx = torch.eye(lbl_size).to(target.device)
+        t = torch.embedding(i_mtx, target)
+        soft_part = torch.ones_like(t)
+        l_softmax = log_softmax(pred, 1)
+        out = -t * l_softmax * self.alpha - soft_part * l_softmax * (1 - self.alpha) / lbl_size
+        out = out.sum(dim=-1)
+
+        return do_reduction(out, reduction=self.reduction)
+
+
 class LabelSmoothingLoss1(torch.nn.Module):
     """
     For Label Smoothing loss (not one-hot but softer) with alpha default 0.9.
     Similar to `torch.nn.CrossEntropyLoss` but now with softer
+    pred: [bs, lbl_size], target: [bs]
+    NOTE:   there is a risk when does not sum out before the reduction step.
+            the class mostly use with mean reduction, but if none given, then it will fail
+            we do not correct it, just use newer version `LabelSmoothingLoss`.
+            This class just keep for old reference.
     """
 
     def __init__(self, alpha=0.9, reduction='mean', **kwargs):
@@ -314,9 +343,10 @@ class DistCutOffLoss(torch.nn.Module):
     See `torch.nn.modules.loss._Loss`
     """
 
-    def __init__(self, reduction='mean', **kwargs):
+    def __init__(self, reduction='mean', part=2, **kwargs):
         super().__init__()
         self.reduction = reduction
+        self.part = part
 
     def forward(self, pred, target):
         # calc cross entropy in raw mode (return [bs])
@@ -327,8 +357,10 @@ class DistCutOffLoss(torch.nn.Module):
             lbl_correct = target.argmax(dim=-1)
             c_pred, c_target = pred[:, lbl_correct], target[:, lbl_correct]
             zeros, ones = torch.zeros(1), torch.ones(1)
+            zeros, ones = zeros.to(target.device), ones.to(target.device)
+            one_part = ones / self.part
             # [bs] which 0 or 1
-            weighted = torch.where(c_pred < c_target, ones, zeros)
+            weighted = torch.where(c_pred < c_target, ones, one_part)
         out = out * weighted
 
         return do_reduction(out, reduction=self.reduction)
