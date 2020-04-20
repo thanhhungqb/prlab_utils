@@ -331,6 +331,36 @@ class LabelSmoothingLoss1(torch.nn.Module):
 SoftLoss = LabelSmoothingLoss1  # for old reference
 
 
+class LabelSmoothingLossDis(LabelSmoothingLoss):
+    """
+    Like `LabelSmoothingLoss`, but the given is distribution (by statistical)
+    pred: [bs, lbl_size], target: [bs, lbl_size]
+    """
+
+    def __init__(self, alpha=0.5, **kwargs):
+        super().__init__(alpha=alpha, **kwargs)
+
+    def forward(self, pred, target):
+        lbl_size = pred.size()[-1]
+        i_mtx = torch.eye(lbl_size).to(target.device)
+
+        with torch.no_grad():
+            lbl_correct = target.argmax(dim=-1)
+            one_hot = torch.embedding(i_mtx, lbl_correct)
+
+        l_softmax = log_softmax(pred, 1)
+        out = -(one_hot * self.alpha + target * (1 - self.alpha)) * l_softmax
+        out = out.sum(dim=-1)
+
+        return do_reduction(out, reduction=self.reduction)
+
+
+class LabelSmoothingLossDisRaw(LabelSmoothingLossDis):
+    def __init__(self, **kwargs):
+        kwargs['reduction'] = 'none'  # just set none to return raw
+        super().__init__(**kwargs)
+
+
 class DistCutOffLoss(torch.nn.Module):
     """
     Use cross entropy loss but with the prior distribution and cut off for correct label
