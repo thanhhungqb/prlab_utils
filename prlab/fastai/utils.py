@@ -6,6 +6,7 @@ from typing import Any
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+import torchvision
 from fastai import callbacks
 from fastai.basic_data import DatasetType
 from fastai.basic_train import Learner
@@ -14,7 +15,7 @@ from fastai.callbacks import SaveModelCallback, CSVLogger
 from fastai.metrics import top_k_accuracy, accuracy
 from fastai.torch_core import MetricsList
 from fastai.train import ClassificationInterpretation
-from fastai.vision import imagenet_stats, get_transforms, models
+from fastai.vision import imagenet_stats, get_transforms, models, open_image
 from torch.autograd import Variable
 from torch.nn.functional import log_softmax
 
@@ -639,6 +640,32 @@ def base_arch_str_to_obj(base_arch):
         else models.vgg16_bn if base_arch in ['vgg16', 'vgg16_bn'] or base_arch is None \
         else base_arch  # custom TODO not need create base_model in below line
     return base_arch
+
+
+def viz_grid_images(files, is_show=False, png_file=None):
+    """
+    :param files: [rowxcol], must same size
+    :param is_show: to show
+    :param png_file: if not None then save
+    :return:
+    """
+    all_imgs = []
+    for row_f in files:
+        row_imgs = [open_image(f).data for f in row_f]
+        row_imgs = torch.stack(row_imgs, dim=0)
+        all_imgs.append(row_imgs)
+
+    batch_tensor = torch.cat(all_imgs, dim=0)
+
+    # make with the number of column is the len of first row (all row must be same size)
+    grid_img = torchvision.utils.make_grid(batch_tensor, nrow=len(files[0]))
+
+    fig, ax = plt.subplots()
+    ax.imshow(grid_img.permute(1, 2, 0))
+    fig.savefig(png_file) if png_file is not None else None
+    plt.show() if is_show else None
+
+    return fig, ax
 
 
 top2_acc = partial(top_k_accuracy, k=2)
