@@ -392,7 +392,7 @@ def data_load_folder_df(**config):
         ImageList.from_folder(data_helper.path)
             .filter_by_func(data_helper.filter_train_fn)
             .split_by_valid_func(data_helper.split_valid_fn)
-            .label_from_func(data_helper.y_func)
+            .label_from_func(data_helper.y_func, label_cls=config['data_helper'].label_cls)
             .transform(config['tfms'], size=config['img_size'])
             .databunch(bs=config['bs'])
     ).normalize(imagenet_stats)
@@ -401,7 +401,7 @@ def data_load_folder_df(**config):
     data_test = (
         ImageList.from_folder(data_helper.path)
             .split_by_valid_func(data_helper.filter_test_fn)
-            .label_from_func(data_helper.y_func)
+            .label_from_func(data_helper.y_func, label_cls=config['data_helper'].label_cls)
             .transform(config['tfms'], size=config['img_size'])
             .databunch(bs=config['bs'])
     ).normalize(imagenet_stats)
@@ -637,7 +637,7 @@ def make_report_cls(**config):
     if hasattr(config['data_test'], 'classes') and config['data_test'].classes is not None:
         classes = np.array(config['data_test'].classes)
     else:
-        classes = np.array(config.get('label_names', None))
+        classes = np.array(config['label_names']) if config.get('label_names', None) is not None else None
 
     # when we want to override classes in data_test to another from configure, one flag need
     if config.get('replace_classes', False):
