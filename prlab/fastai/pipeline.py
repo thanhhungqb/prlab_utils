@@ -645,6 +645,8 @@ def make_report_cls(**config):
 
     print('classes (order)', classes)
 
+    items = np.array([str(o) for o in config['data_test'].valid_ds.items])
+
     accs, f1s, to_save = [], [], {}
     uas = []
     for run_num in range(config.get('tta_times', 3)):
@@ -658,6 +660,7 @@ def make_report_cls(**config):
         accs.append(nltk.accuracy(ys_labels, y_labels))
         f1 = sklearn.metrics.f1_score(y_labels, ys_labels, average='macro')  # micro macro
         to_save['time_{}'.format(run_num)] = {'ys': ys_npy, 'y': y_npy, 'acc': accs[-1], 'f1': f1}
+        to_save['time_{}'.format(run_num)]['items'] = items
         print('run', run_num, accs[-1], 'f1', f1)
 
         _, fig = plot_confusion_matrix(y_labels, ys_labels,
@@ -696,7 +699,7 @@ def make_report_cls(**config):
 
 def make_report_general(**config):
     """
-    Report for regression or some general case, where just forcus on metrics
+    Report for regression or some general case, where just focus on metrics
     Follow Pipeline Process template.
     :param config: contains data_test store test in valid mode, tta_times (if have)
     :return: new config
@@ -715,6 +718,8 @@ def make_report_general(**config):
     metrics = config['metrics']
     metrics = metrics if isinstance(metrics, list) else [metrics]
 
+    items = np.array([str(o) for o in config['data_test'].valid_ds.items])
+
     for run_num in range(config.get('tta_times', 3)):
         ys, y = learn.TTA(ds_type=DatasetType.Valid, scale=config.get('test_scale', 1.10))
 
@@ -724,6 +729,7 @@ def make_report_general(**config):
 
         outs = [o.numpy().tolist() for o in outs]
         to_save['time_{}'.format(run_num)] = {'outs': outs, 'ys': ys.numpy(), 'y': y.numpy()}
+        to_save['time_{}'.format(run_num)]['items'] = items
 
         metric_outs.append(outs)
         tmp_s = npy_arr_pretty_print(np.array(outs))
