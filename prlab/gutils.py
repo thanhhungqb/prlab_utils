@@ -13,7 +13,10 @@ import sklearn
 from sklearn import preprocessing
 
 # add ls function to Path for easy to use
+from outside.utils import find_modules
+
 Path.ls = lambda x: list(x.iterdir())
+prlab_modules = ['prlab.{}'.format(o) for o in find_modules(['prlab'])]
 
 
 def clean_str(s): return '_'.join(s.split()).replace('/', '')
@@ -586,6 +589,49 @@ def npy_arr_pretty_print(npy_arr, fm='{:.4f}'):
         npy_arr = np.array(npy_arr)
     to_print = "\t".join(arr_out) if len(npy_arr.shape) < 2 else "\n".join(arr_out)
     return to_print
+
+
+def fix_name_func_class(**config):
+    """
+    Fix name of func or class/obj when write to a JSON that it's not full path name (only class/func name)
+    Try to load all names in prlab module and match.
+    Error form:
+        "<function norm_weights_acc at 0x7fa18fad5440>"
+    Follow Pipeline Process template, Could add to the pipeline (if pass dict)
+    :param config:
+    :return:
+    """
+
+    for k in config.keys():
+        val = config[k]
+        if isinstance(val, dict):
+            config[k] = fix_name_func_class(**val)
+        if isinstance(val, (tuple, list)):
+            config[k] = [fix_name_func_class(x=o)['x'] for o in val]
+
+        if isinstance(val, str):
+            if val.startswith('<function') and val.endswith('>'):
+                name_fn = obj_func_str_split(val)
+                arr = name_fn.split('.')
+                if len(arr) == 1:
+                    name_fn = arr[0]
+                    la = []
+                    for mod_name in prlab_modules:
+                        try:
+                            if hasattr(importlib.import_module(mod_name), name_fn):
+                                la.append(mod_name)
+                        except:
+                            """there are some module not completed then raise exception when load"""
+
+                    if len(la) == 0:
+                        raise Exception('there are no function {} in prlab submodule'.format(name_fn))
+                    if len(la) > 1:
+                        print('there are many version for {} in prlab.* including {}'.format(name_fn, ';'.join(la)))
+
+                    config[k] = '{}.{}'.format(la[0], name_fn)
+                    print('update', k, config[k])
+
+    return config
 
 
 def balanced_sampler(labels: list, n_each=1000, replacement=False):
