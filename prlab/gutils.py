@@ -663,6 +663,21 @@ def balanced_sampler(labels: list, n_each=1000, replacement=False):
     return selected_pos
 
 
+def avg_std_3d(arr):
+    """
+    3D average and std, mostly use for list of images
+    :param arr: [n x w x h]
+    :return: [w x h], [w x h] avg and std
+    """
+    size = arr.shape
+    avg, std = np.zeros((size[1], size[2])), np.zeros((size[1], size[2]))
+    for row in range(size[1]):
+        for col in range(size[2]):
+            avg[row][col] = np.average(arr[:, row, col])
+            std[row][col] = np.std(arr[:, row, col])
+    return avg, std
+
+
 def test_make_check_point_folder():
     print(make_check_point_folder("/tmp"))
 
