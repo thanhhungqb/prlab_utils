@@ -678,6 +678,21 @@ def avg_std_3d(arr):
     return avg, std
 
 
+def summary_2d(arr, func=np.average):
+    """
+    The summary to 2d from the 3D input
+    :param arr: [n x w x h]
+    :param func: numpy function, work with 1D (along to n direction)
+    :return: [w x h]
+    """
+    size = arr.shape
+    summary = np.zeros((size[1], size[2]))
+    for row in range(size[1]):
+        for col in range(size[2]):
+            summary[row][col] = np.average(arr[:, row, col])
+    return summary
+
+
 def test_make_check_point_folder():
     print(make_check_point_folder("/tmp"))
 
