@@ -274,6 +274,17 @@ def stn_sr_xn(**config):
     return learn, layer_groups
 
 
+def build_unet_model(**config):
+    config['learn'] = unet_learner(
+        config['data'],
+        models.resnet34,
+        metrics=config.get('metrics', None),
+        wd=config.get('wd', 1e-2),
+        model_dir=config['cp'])
+
+    return config
+
+
 def wrap_pipeline_style_fn(old_func):
     """
     Wrap the old_func to new style fn(**config): new_config and then can add to pipeline directly
@@ -471,6 +482,23 @@ def data_load_folder_balanced(**config):
     return config
 
 
+# ********** Segmentation data loader ************
+def load_seg_data(**config):
+    dh = config['data_helper']
+    bs = config.get('bs', 16)
+    classes = config.get('classes', None)
+
+    src = (SegmentationItemList.from_folder(config['path'])
+           .split_by_valid_func(dh.valid_fn)
+           .label_from_func(dh.get_y_fn, classes=classes))
+
+    config['data'] = (src.transform(config['tfms'], size=config['img_size'], tfm_y=True)
+                      .databunch(bs=bs)
+                      .normalize(imagenet_stats))
+
+    return config
+
+
 # *************** TRAINING PROCESS **********************************
 def training_simple(**config):
     """
@@ -510,6 +538,30 @@ def training_simple_2_steps(**config):
     lr_2 = config.get('lr_2', lr)
     epochs_2 = config.get('epochs_2', epochs)
     learn.fit_one_cycle(epochs_2, max_lr=lr_2)
+
+    return config
+
+
+def train_seg_two_steps(**config):
+    learn = config['learn']
+
+    lr = config.get('lr', 1e-3)
+    epochs = config.get('epochs', 10)
+    learn.fit_one_cycle(epochs, slice(lr), pct_start=0.9)  # train model
+
+    learn.save('freeze')  # save model
+
+    learn.unfreeze()  # unfreeze all layers
+
+    # find and plot lr again
+    learn.unfreeze()
+    learn.recorder.plot()
+
+    lr_2 = config.get('lr_2', lr / 4)
+    epochs_2 = config.get('epochs_2', epochs)
+    learn.fit_one_cycle(epochs_2, slice(lr_2 / 100, lr_2), pct_start=0.8)
+
+    learn.save(config.get('best_name', 'best'))
 
     return config
 
