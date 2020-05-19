@@ -612,7 +612,7 @@ def general_configure(**config):
     config['path'] = Path(config['path'])
     config['model_path'] = Path(config['model_path'])
 
-    cp, best_name, csv_log = make_check_point_folder(config, None, config['run'])
+    cp, best_name, csv_log = make_check_point_folder(config, None, config.get('run', 'test'))
     loss_func = config.get('loss_func', None)
     config.update({
         'data_helper': convert_to_obj(config.get('data_helper', None), **config),
