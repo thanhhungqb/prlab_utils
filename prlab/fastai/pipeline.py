@@ -280,7 +280,7 @@ def build_unet_model(**config):
         models.resnet34,
         metrics=config.get('metrics', None),
         wd=config.get('wd', 1e-2),
-        model_dir=config['cp'])
+        model_dir=config['model_path'])
 
     return config
 
