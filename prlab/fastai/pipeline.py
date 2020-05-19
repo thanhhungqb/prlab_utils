@@ -1016,3 +1016,20 @@ def fold_after(**config):
     [f.rename(cp_fold / f'{f.name}') for f in cp_files]
 
     return config
+
+
+# define some popular pipe that can be widely use
+default_conf_pipeline = {
+    'process_pipeline_2': [
+        # leave 0 and 1 for some early configure
+        device_setup,
+        general_configure,
+    ],
+
+    'process_pipeline_12': [
+        # 2-11 is for data load and model build
+        learn_general_setup,
+        resume_learner,
+        train_seg_two_steps
+    ]
+}
