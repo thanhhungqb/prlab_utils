@@ -12,7 +12,7 @@ from fastai.basic_data import DatasetType
 from fastai.basic_train import Learner
 from fastai.callback import Callback
 from fastai.callbacks import SaveModelCallback, CSVLogger
-from fastai.metrics import top_k_accuracy, accuracy
+from fastai.metrics import top_k_accuracy, accuracy, dice
 from fastai.torch_core import MetricsList
 from fastai.train import ClassificationInterpretation
 from fastai.vision import imagenet_stats, get_transforms, models, open_image
@@ -620,6 +620,7 @@ def general_configure(**config):
         'loss_func': convert_to_obj_or_fn(loss_func, **config) if isinstance(loss_func, str) else loss_func,
         'tfms': get_transforms_wrap(xtra_tfms=[], **config),
         'callback_fn': lambda: get_callbacks(best_name=best_name, csv_filename=csv_log),
+        'cp': cp,
     })
     print(cp)
 
@@ -675,3 +676,4 @@ top2_acc.__name__ = 'top2_accuracy'
 top3_acc.__name__ = 'top3_accuracy'
 top5_acc.__name__ = 'top5_accuracy'
 tmetrics = [accuracy, top2_acc, top3_acc]
+iou = partial(dice, iou=True)
