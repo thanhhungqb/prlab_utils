@@ -1040,5 +1040,6 @@ default_conf_pipeline = {
         # 2-11 is for data load and model build
         learn_general_setup,
         resume_learner,
-    ]
+    ],
+    'process_pipeline_102': [make_report_general],
 }
