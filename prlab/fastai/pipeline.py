@@ -496,6 +496,16 @@ def load_seg_data(**config):
                       .databunch(bs=bs)
                       .normalize(imagenet_stats))
 
+    # load test set if given in path_test
+    if config.get('path_test', None) is not None:
+        src_test = (seg_item_list_cls.from_folder(config['path_test'], ignore_empty=True)
+                    .split_by_valid_func(lambda x: True)
+                    .label_from_func(dh.get_y_fn, classes=classes))
+        config['data_test'] = (src_test.transform(config['tfms'], size=config['img_size'], tfm_y=True)
+                               .databunch(bs=bs)
+                               .normalize(imagenet_stats))
+        print(config['data_test'])
+
     return config
 
 
@@ -1030,6 +1040,5 @@ default_conf_pipeline = {
         # 2-11 is for data load and model build
         learn_general_setup,
         resume_learner,
-        train_seg_two_steps
     ]
 }
