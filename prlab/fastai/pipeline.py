@@ -487,8 +487,8 @@ def load_seg_data(**config):
     dh = config['data_helper']
     bs = config.get('bs', 16)
     classes = config.get('classes', None)
-
-    src = (SegmentationItemList.from_folder(config['path'])
+    seg_item_list_cls = config.get('seg_item_list_cls', SegmentationItemList)
+    src = (seg_item_list_cls.from_folder(config['path'])
            .split_by_valid_func(dh.valid_fn)
            .label_from_func(dh.get_y_fn, classes=classes))
 
