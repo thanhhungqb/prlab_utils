@@ -676,4 +676,6 @@ top2_acc.__name__ = 'top2_accuracy'
 top3_acc.__name__ = 'top3_accuracy'
 top5_acc.__name__ = 'top5_accuracy'
 tmetrics = [accuracy, top2_acc, top3_acc]
+
 iou = partial(dice, iou=True)
+iou.__name__ = 'iou'
