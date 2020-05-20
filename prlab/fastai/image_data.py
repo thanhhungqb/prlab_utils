@@ -145,3 +145,16 @@ class SamplerImageList(ImageList):
     Extend ImageList to custom databunch, and to sampler
     """
     _bunch = SamplerImageDataBunch
+
+
+# for segmentation task
+# credit: https://stackoverflow.com/questions/59520705
+# when mask is in 0/255 instead 0/1
+class SegLabelListDiv(SegmentationLabelList):
+    # to process mask in mode 0/255 (instead default 0/1)
+    def open(self, fn): return open_mask(fn, div=True)
+
+
+class SegItemListDiv(SegmentationItemList):
+    # to process mask in mode 0/255 (instead default 0/1)
+    _label_cls = SegLabelListDiv
