@@ -782,8 +782,9 @@ def make_report_general(**config):
 
     items = np.array([str(o) for o in config['data_test'].valid_ds.items])
 
-    for run_num in range(config.get('tta_times', 3)):
-        ys, y = learn.TTA(ds_type=DatasetType.Valid, scale=config.get('test_scale', 1.10))
+    for run_num in range(config.get('tta_times', 3) if not config.get('NON_TTA', False) else 1):
+        ys, y = learn.TTA(ds_type=DatasetType.Valid, scale=config.get('test_scale', 1.10)) \
+            if not config.get('NON_TTA', False) else learn.get_preds()
 
         outs = [o(ys, y) for o in metrics]
 
