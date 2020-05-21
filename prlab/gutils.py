@@ -13,7 +13,10 @@ import sklearn
 from sklearn import preprocessing
 
 # add ls function to Path for easy to use
+from outside.utils import find_modules
+
 Path.ls = lambda x: list(x.iterdir())
+prlab_modules = ['prlab.{}'.format(o) for o in find_modules(['prlab'])]
 
 
 def clean_str(s): return '_'.join(s.split()).replace('/', '')
@@ -588,6 +591,49 @@ def npy_arr_pretty_print(npy_arr, fm='{:.4f}'):
     return to_print
 
 
+def fix_name_func_class(**config):
+    """
+    Fix name of func or class/obj when write to a JSON that it's not full path name (only class/func name)
+    Try to load all names in prlab module and match.
+    Error form:
+        "<function norm_weights_acc at 0x7fa18fad5440>"
+    Follow Pipeline Process template, Could add to the pipeline (if pass dict)
+    :param config:
+    :return:
+    """
+
+    for k in config.keys():
+        val = config[k]
+        if isinstance(val, dict):
+            config[k] = fix_name_func_class(**val)
+        if isinstance(val, (tuple, list)):
+            config[k] = [fix_name_func_class(x=o)['x'] for o in val]
+
+        if isinstance(val, str):
+            if val.startswith('<function') and val.endswith('>'):
+                name_fn = obj_func_str_split(val)
+                arr = name_fn.split('.')
+                if len(arr) == 1:
+                    name_fn = arr[0]
+                    la = []
+                    for mod_name in prlab_modules:
+                        try:
+                            if hasattr(importlib.import_module(mod_name), name_fn):
+                                la.append(mod_name)
+                        except:
+                            """there are some module not completed then raise exception when load"""
+
+                    if len(la) == 0:
+                        raise Exception('there are no function {} in prlab submodule'.format(name_fn))
+                    if len(la) > 1:
+                        print('there are many version for {} in prlab.* including {}'.format(name_fn, ';'.join(la)))
+
+                    config[k] = '{}.{}'.format(la[0], name_fn)
+                    print('update', k, config[k])
+
+    return config
+
+
 def balanced_sampler(labels: list, n_each=1000, replacement=False):
     """
     Balanced Sampler from labels and get n_each for each label kind.
@@ -615,6 +661,36 @@ def balanced_sampler(labels: list, n_each=1000, replacement=False):
             selected_pos.append(p)
 
     return selected_pos
+
+
+def avg_std_3d(arr):
+    """
+    3D average and std, mostly use for list of images
+    :param arr: [n x w x h]
+    :return: [w x h], [w x h] avg and std
+    """
+    size = arr.shape
+    avg, std = np.zeros((size[1], size[2])), np.zeros((size[1], size[2]))
+    for row in range(size[1]):
+        for col in range(size[2]):
+            avg[row][col] = np.average(arr[:, row, col])
+            std[row][col] = np.std(arr[:, row, col])
+    return avg, std
+
+
+def summary_2d(arr, func=np.average):
+    """
+    The summary to 2d from the 3D input
+    :param arr: [n x w x h]
+    :param func: numpy function, work with 1D (along to n direction)
+    :return: [w x h]
+    """
+    size = arr.shape
+    summary = np.zeros((size[1], size[2]))
+    for row in range(size[1]):
+        for col in range(size[2]):
+            summary[row][col] = np.average(arr[:, row, col])
+    return summary
 
 
 def test_make_check_point_folder():

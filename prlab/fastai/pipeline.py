@@ -274,6 +274,17 @@ def stn_sr_xn(**config):
     return learn, layer_groups
 
 
+def build_unet_model(**config):
+    config['learn'] = unet_learner(
+        config['data'],
+        models.resnet34,
+        metrics=config.get('metrics', None),
+        wd=config.get('wd', 1e-2),
+        model_dir=config['cp'])
+
+    return config
+
+
 def wrap_pipeline_style_fn(old_func):
     """
     Wrap the old_func to new style fn(**config): new_config and then can add to pipeline directly
@@ -471,6 +482,37 @@ def data_load_folder_balanced(**config):
     return config
 
 
+# ********** Segmentation data loader ************
+def load_seg_data(**config):
+    dh = config['data_helper']
+    bs = config.get('bs', 16)
+    classes = config.get('classes', None)
+    seg_item_list_cls = config.get('seg_item_list_cls', SegmentationItemList)
+    src = (seg_item_list_cls.from_folder(config['path'],
+                                         convert_mode=config.get('convert_mode', 'RGB'))
+           .filter_by_func(dh.filter_func)
+           .split_by_valid_func(dh.valid_fn)
+           .label_from_func(dh.y_func, classes=classes))
+
+    config['data'] = (src.transform(config['tfms'], size=config['img_size'], tfm_y=True)
+                      .databunch(bs=bs)
+                      .normalize(imagenet_stats))
+
+    # load test set if given in path_test
+    if config.get('path_test', None) is not None:
+        src_test = (seg_item_list_cls.from_folder(config['path_test'],
+                                                  convert_mode=config.get('convert_mode', 'RGB'))
+                    .filter_by_func(dh.filter_func)
+                    .split_by_valid_func(lambda x: True)
+                    .label_from_func(dh.y_func, classes=classes))
+        config['data_test'] = (src_test.transform(config['tfms'], size=config['img_size'], tfm_y=True)
+                               .databunch(bs=bs)
+                               .normalize(imagenet_stats))
+        print(config['data_test'])
+
+    return config
+
+
 # *************** TRAINING PROCESS **********************************
 def training_simple(**config):
     """
@@ -510,6 +552,30 @@ def training_simple_2_steps(**config):
     lr_2 = config.get('lr_2', lr)
     epochs_2 = config.get('epochs_2', epochs)
     learn.fit_one_cycle(epochs_2, max_lr=lr_2)
+
+    return config
+
+
+def train_seg_two_steps(**config):
+    learn = config['learn']
+
+    lr = config.get('lr', 1e-3)
+    epochs = config.get('epochs', 10)
+    learn.fit_one_cycle(epochs, slice(lr), pct_start=0.9)  # train model
+
+    learn.save('freeze')  # save model
+
+    learn.unfreeze()  # unfreeze all layers
+
+    # find and plot lr again
+    learn.unfreeze()
+    learn.recorder.plot()
+
+    lr_2 = config.get('lr_2', lr / 4)
+    epochs_2 = config.get('epochs_2', epochs)
+    learn.fit_one_cycle(epochs_2, slice(lr_2 / 100, lr_2), pct_start=0.8)
+
+    learn.save(config.get('best_name', 'best'))
 
     return config
 
@@ -615,6 +681,29 @@ def two_step_train_saliency(**config):
 
 
 # *************** REPORT **********************************
+def backup_learner_data_decorator(fn):
+    def fn_(**config):
+        learn = config['learn']
+
+        # make backup of current data of learn
+        data_current = learn.data
+        if hasattr(learn.model, 'is_testing'):
+            learn.model.is_testing = True
+        learn.data = config['data_test']
+
+        config = fn(**config)
+
+        # roll back for data in learn
+        learn.data = data_current
+        if hasattr(learn.model, 'is_testing'):
+            learn.model.is_testing = False
+
+        return config
+
+    return fn_
+
+
+@backup_learner_data_decorator
 def make_report_cls(**config):
     """
     Newer, simpler version of `prlab.emotion.ferplus.sr_stn_vgg_8classes.run_report`,
@@ -629,10 +718,6 @@ def make_report_cls(**config):
     learn = config['learn']
     cp = config['cp']
 
-    data_current = learn.data  # make backup of current data of learn
-    if hasattr(learn.model, 'is_testing'):
-        learn.model.is_testing = True
-    learn.data = config['data_test']
     print(config['data_test'])
     if hasattr(config['data_test'], 'classes') and config['data_test'].classes is not None:
         classes = np.array(config['data_test'].classes)
@@ -644,6 +729,8 @@ def make_report_cls(**config):
         classes = np.array(config.get('label_names', None))
 
     print('classes (order)', classes)
+
+    items = np.array([str(o) for o in config['data_test'].valid_ds.items])
 
     accs, f1s, to_save = [], [], {}
     uas = []
@@ -658,6 +745,7 @@ def make_report_cls(**config):
         accs.append(nltk.accuracy(ys_labels, y_labels))
         f1 = sklearn.metrics.f1_score(y_labels, ys_labels, average='macro')  # micro macro
         to_save['time_{}'.format(run_num)] = {'ys': ys_npy, 'y': y_npy, 'acc': accs[-1], 'f1': f1}
+        to_save['time_{}'.format(run_num)]['items'] = items
         print('run', run_num, accs[-1], 'f1', f1)
 
         _, fig = plot_confusion_matrix(y_labels, ys_labels,
@@ -686,17 +774,13 @@ def make_report_cls(**config):
 
     np.save(cp / "results", to_save)
 
-    # roll back for data in learn
-    learn.data = data_current
-    if hasattr(learn.model, 'is_testing'):
-        learn.model.is_testing = False
-
     return config
 
 
+@backup_learner_data_decorator
 def make_report_general(**config):
     """
-    Report for regression or some general case, where just forcus on metrics
+    Report for regression or some general case, where just focus on metrics
     Follow Pipeline Process template.
     :param config: contains data_test store test in valid mode, tta_times (if have)
     :return: new config
@@ -705,18 +789,17 @@ def make_report_general(**config):
     learn = config['learn']
     cp = config['cp']
 
-    data_current = learn.data  # make backup of current data of learn
-    if hasattr(learn.model, 'is_testing'):
-        learn.model.is_testing = True
-    learn.data = config['data_test']
     print(config['data_test'])
 
     metric_outs, to_save = [], {}
     metrics = config['metrics']
     metrics = metrics if isinstance(metrics, list) else [metrics]
 
-    for run_num in range(config.get('tta_times', 3)):
-        ys, y = learn.TTA(ds_type=DatasetType.Valid, scale=config.get('test_scale', 1.10))
+    items = np.array([str(o) for o in config['data_test'].valid_ds.items])
+
+    for run_num in range(config.get('tta_times', 3) if not config.get('NON_TTA', False) else 1):
+        ys, y = learn.TTA(ds_type=DatasetType.Valid, scale=config.get('test_scale', 1.10)) \
+            if not config.get('NON_TTA', False) else learn.get_preds()
 
         outs = [o(ys, y) for o in metrics]
 
@@ -724,6 +807,7 @@ def make_report_general(**config):
 
         outs = [o.numpy().tolist() for o in outs]
         to_save['time_{}'.format(run_num)] = {'outs': outs, 'ys': ys.numpy(), 'y': y.numpy()}
+        to_save['time_{}'.format(run_num)]['items'] = items
 
         metric_outs.append(outs)
         tmp_s = npy_arr_pretty_print(np.array(outs))
@@ -744,15 +828,32 @@ def make_report_general(**config):
 
     np.save(cp / "results", to_save)
 
-    # roll back for data in learn
-    learn.data = data_current
-    if hasattr(learn.model, 'is_testing'):
-        learn.model.is_testing = False
-
     return config
 
 
 make_report_regression = make_report_general
+
+
+@backup_learner_data_decorator
+def make_predict_seg(**config):
+    """ make some sample for segmentation return list[(input, output, gt)]. Also save to file """
+    print('get (img, gt, pred) and save to config to use later. e.g. slide_bar_show, save to file, viz')
+
+    ys, gt = config['learn'].get_preds()
+    xs = ys.argmax(dim=1)
+    gt, xs = torch.squeeze(gt, dim=1), torch.squeeze(xs, dim=1)
+
+    test_ds = config['data_test'].valid_ds
+    imgs = [torch.squeeze(test_ds.get(i).data, dim=0) for i in range(len(test_ds))]
+
+    config['out'] = {
+        'imgs': imgs,
+        'gt': gt,
+        'pred': xs,
+    }
+    # e.g. multi_slide_bar([imgs, gt, xs])
+
+    return config
 
 
 # *************** WEIGHTS LOAD **********************************
@@ -958,3 +1059,20 @@ def fold_after(**config):
     [f.rename(cp_fold / f'{f.name}') for f in cp_files]
 
     return config
+
+
+# define some popular pipe that can be widely use
+default_conf_pipeline = {
+    'process_pipeline_2': [
+        # leave 0 and 1 for some early configure
+        device_setup,
+        general_configure,
+    ],
+
+    'process_pipeline_12': [
+        # 2-11 is for data load and model build
+        learn_general_setup,
+        resume_learner,
+    ],
+    'process_pipeline_102': [make_report_general],
+}
