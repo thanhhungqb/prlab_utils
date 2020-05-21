@@ -834,6 +834,28 @@ def make_report_general(**config):
 make_report_regression = make_report_general
 
 
+@backup_learner_data_decorator
+def make_predict_seg(**config):
+    """ make some sample for segmentation return list[(input, output, gt)]. Also save to file """
+    print('get (img, gt, pred) and save to config to use later. e.g. slide_bar_show, save to file, viz')
+
+    ys, gt = config['learn'].get_preds()
+    xs = ys.argmax(dim=1)
+    gt, xs = torch.squeeze(gt, dim=1), torch.squeeze(xs, dim=1)
+
+    test_ds = config['data_test'].valid_ds
+    imgs = [torch.squeeze(test_ds.get(i).data, dim=0) for i in range(len(test_ds))]
+
+    config['out'] = {
+        'imgs': imgs,
+        'gt': gt,
+        'pred': xs,
+    }
+    # e.g. multi_slide_bar([imgs, gt, xs])
+
+    return config
+
+
 # *************** WEIGHTS LOAD **********************************
 def srnet3_weights_load(**config):
     """
