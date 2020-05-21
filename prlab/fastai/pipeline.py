@@ -489,6 +489,7 @@ def load_seg_data(**config):
     classes = config.get('classes', None)
     seg_item_list_cls = config.get('seg_item_list_cls', SegmentationItemList)
     src = (seg_item_list_cls.from_folder(config['path'])
+           .filter_by_func(dh.filter_func)
            .split_by_valid_func(dh.valid_fn)
            .label_from_func(dh.y_func, classes=classes))
 
@@ -499,6 +500,7 @@ def load_seg_data(**config):
     # load test set if given in path_test
     if config.get('path_test', None) is not None:
         src_test = (seg_item_list_cls.from_folder(config['path_test'], ignore_empty=True)
+                    .filter_by_func(dh.filter_func)
                     .split_by_valid_func(lambda x: True)
                     .label_from_func(dh.y_func, classes=classes))
         config['data_test'] = (src_test.transform(config['tfms'], size=config['img_size'], tfm_y=True)
