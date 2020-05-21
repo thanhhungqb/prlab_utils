@@ -681,6 +681,29 @@ def two_step_train_saliency(**config):
 
 
 # *************** REPORT **********************************
+def backup_learner_data_decorator(fn):
+    def fn_(**config):
+        learn = config['learn']
+
+        # make backup of current data of learn
+        data_current = learn.data
+        if hasattr(learn.model, 'is_testing'):
+            learn.model.is_testing = True
+        learn.data = config['data_test']
+
+        config = fn(**config)
+
+        # roll back for data in learn
+        learn.data = data_current
+        if hasattr(learn.model, 'is_testing'):
+            learn.model.is_testing = False
+
+        return config
+
+    return fn_
+
+
+@backup_learner_data_decorator
 def make_report_cls(**config):
     """
     Newer, simpler version of `prlab.emotion.ferplus.sr_stn_vgg_8classes.run_report`,
@@ -695,10 +718,6 @@ def make_report_cls(**config):
     learn = config['learn']
     cp = config['cp']
 
-    data_current = learn.data  # make backup of current data of learn
-    if hasattr(learn.model, 'is_testing'):
-        learn.model.is_testing = True
-    learn.data = config['data_test']
     print(config['data_test'])
     if hasattr(config['data_test'], 'classes') and config['data_test'].classes is not None:
         classes = np.array(config['data_test'].classes)
@@ -755,14 +774,10 @@ def make_report_cls(**config):
 
     np.save(cp / "results", to_save)
 
-    # roll back for data in learn
-    learn.data = data_current
-    if hasattr(learn.model, 'is_testing'):
-        learn.model.is_testing = False
-
     return config
 
 
+@backup_learner_data_decorator
 def make_report_general(**config):
     """
     Report for regression or some general case, where just focus on metrics
@@ -774,10 +789,6 @@ def make_report_general(**config):
     learn = config['learn']
     cp = config['cp']
 
-    data_current = learn.data  # make backup of current data of learn
-    if hasattr(learn.model, 'is_testing'):
-        learn.model.is_testing = True
-    learn.data = config['data_test']
     print(config['data_test'])
 
     metric_outs, to_save = [], {}
@@ -816,11 +827,6 @@ def make_report_general(**config):
     print('3 results', stats_str)
 
     np.save(cp / "results", to_save)
-
-    # roll back for data in learn
-    learn.data = data_current
-    if hasattr(learn.model, 'is_testing'):
-        learn.model.is_testing = False
 
     return config
 
