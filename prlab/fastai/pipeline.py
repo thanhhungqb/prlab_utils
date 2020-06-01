@@ -25,7 +25,7 @@ from outside.super_resolution.srnet import SRNet3
 from prlab.fastai.image_data import SamplerImageList
 from prlab.fastai.utils import general_configure, base_arch_str_to_obj
 from prlab.fastai.video_data import BalancedLabelImageList
-from prlab.gutils import load_func_by_name, set_if, npy_arr_pretty_print
+from prlab.gutils import load_func_by_name, set_if, npy_arr_pretty_print, convert_to_obj_or_fn
 from prlab.torch.functions import fc_exchange_label
 
 
@@ -78,10 +78,12 @@ def pipeline_control_multi(**kwargs):
     # this step to make sure all name could be convert to function to call later
     # this is early check
     for pipe_name in ordered_pipeline_names:
-        [load_func_by_name(o)[0] if isinstance(o, str) else o for o in config[pipe_name]]
+        convert_to_obj_or_fn(config[pipe_name])
 
     for pipe_name in ordered_pipeline_names:
-        process_pipeline = [load_func_by_name(o)[0] if isinstance(o, str) else o for o in config[pipe_name]]
+        # TODO in case the previous output config should affect the next step
+        # of the pipeline, then convert_to_obj_or_fn should be call after previous step done.
+        process_pipeline = convert_to_obj_or_fn(config[pipe_name])
         for fn in process_pipeline:
             config = fn(**config)
 
