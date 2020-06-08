@@ -499,6 +499,7 @@ def load_seg_data(**config):
     config['data'] = (src.transform(config['tfms'], size=config['img_size'], tfm_y=True)
                       .databunch(bs=bs)
                       .normalize(imagenet_stats))
+    config['data_train'] = config['data']
 
     # load test set if given in path_test
     if config.get('path_test', None) is not None:
