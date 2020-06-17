@@ -10,8 +10,6 @@ emowlabels = ['Neutral', 'Happy', 'Surprise', 'Sad', 'Angry', 'Disgust', 'Fear']
 emowlabels = [o.lower() for o in emowlabels]
 emowlbl2id = {val: pos for pos, val in enumerate(emowlabels)}
 
-affect_net_labels = ['Neutral', 'Happy', 'Sad', 'Surprise', 'Fear', 'Disgust', 'Anger', 'Contempt']
-
 # from FER+ train set use `prlab.emotion.ferplus.data_helper.calc_train_emotion_distribution`
 # calc_train_emotion_distribution(csv_path=csv_path, train_path=train_path)
 fer_emo_dis = [
@@ -31,3 +29,7 @@ fer2rafdb_mapping = [4, 5, 6, 1, 0, 3, 2]
 
 # mapping from fer_emo_dis
 rafdb_emo_dis = [[fer_emo_dis[i][j] for j in fer2rafdb_mapping] for i in fer2rafdb_mapping]
+
+affect_net_labels = ['Neutral', 'Happy', 'Sad', 'Surprise', 'Fear', 'Disgust', 'Anger', 'Contempt']
+fer2affectnet_mapping = [0, 1, 3, 2, 6, 5, 4, 7]
+affectnet_emo_dis = [[fer_emo_dis[i][j] for j in fer2affectnet_mapping] for i in fer2affectnet_mapping]
