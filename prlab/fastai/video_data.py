@@ -491,6 +491,11 @@ class BalancedLabelImageList(ImageList):
         # make new items by random select each_class_num for each class
         label_fn = data_helper.y_func
         labels = [label_fn(o) for o in items]
+        if isinstance(labels[0], list):
+            # support dis (list of float) instead only id or str of label
+            # get argmax
+            labels = [np.argmax(o) for o in labels]
+
         label_set = list(set(labels))
 
         pos = [o for o in range(len(labels))]
