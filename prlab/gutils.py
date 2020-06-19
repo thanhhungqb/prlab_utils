@@ -693,6 +693,23 @@ def summary_2d(arr, func=np.average):
     return summary
 
 
+def merge_xlsx(files, merged_file=None):
+    """
+    Merge multi xlsx file to one, all file must have a same column name.
+    Just simple add row by row.
+    TODO now just support one sheet (first) in the excel file
+    :param files: file paths
+    :param merged_file: if given then save to new file
+    :return:
+    """
+    dfs = [pd.read_excel(file) for file in files]
+    merged_df = pd.concat(dfs, ignore_index=True)
+
+    merged_df.to_excel(merged_file) if merged_file is not None else None
+
+    return merged_df
+
+
 def test_make_check_point_folder():
     print(make_check_point_folder("/tmp"))
 

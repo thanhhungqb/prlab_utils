@@ -278,8 +278,8 @@ def stn_sr_xn(**config):
 
 def build_unet_model(**config):
     config['learn'] = unet_learner(
-        config['data'],
-        models.resnet34,
+        data=config['data_train'],
+        arch=config.get('arch', models.resnet34),
         metrics=config.get('metrics', None),
         wd=config.get('wd', 1e-2),
         model_dir=config['cp'])
@@ -499,6 +499,7 @@ def load_seg_data(**config):
     config['data'] = (src.transform(config['tfms'], size=config['img_size'], tfm_y=True)
                       .databunch(bs=bs)
                       .normalize(imagenet_stats))
+    config['data_train'] = config['data']
 
     # load test set if given in path_test
     if config.get('path_test', None) is not None:
