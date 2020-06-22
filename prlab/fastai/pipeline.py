@@ -859,6 +859,33 @@ def make_predict_seg(**config):
     return config
 
 
+@backup_learner_data_decorator
+def predict_and_save(**config):
+    print('starting predict_and_save')
+
+    learn = config['learn']
+    cp = config['cp']
+
+    if hasattr(learn.model, 'is_testing'):
+        learn.model.is_testing = config.get('is_testing', True)
+
+    print(config['data_test'])
+
+    to_save = {}
+    items = np.array([str(o) for o in config['data_test'].valid_ds.items])
+    for run_num in range(config.get('tta_times', 3)):
+        ys, y = learn.TTA(ds_type=DatasetType.Valid, scale=config.get('test_scale', 1.10))
+
+        ys_npy, y_npy = ys.numpy(), y.numpy()
+
+        to_save['time_{}'.format(run_num)] = {'ys': ys_npy, 'y': y_npy}
+        to_save['time_{}'.format(run_num)]['items'] = items
+
+    np.save(cp / "result-raw", to_save)
+
+    return config
+
+
 # *************** WEIGHTS LOAD **********************************
 def srnet3_weights_load(**config):
     """
