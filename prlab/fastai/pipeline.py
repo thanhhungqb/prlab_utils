@@ -1091,6 +1091,11 @@ def fold_after(**config):
     return config
 
 
+def unfreeze(**config):
+    config['learn'].unfreeze()
+    return config
+
+
 # define some popular pipe that can be widely use
 default_conf_pipeline = {
     'process_pipeline_2': [
