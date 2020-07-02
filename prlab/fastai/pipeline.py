@@ -838,6 +838,44 @@ make_report_regression = make_report_general
 
 
 @backup_learner_data_decorator
+def make_report_simple(**config):
+    """
+    Follow Pipeline Process template in `prlab.fastai.pipeline.pipeline_control_multi`.
+    :param config:
+    :return: new config with output
+    """
+    learn = config['learn']
+    preds, gt = learn.get_preds(DatasetType.Valid)
+
+    metrics = learn.metrics
+    metrics = metrics if isinstance(metrics, list) else [metrics]
+
+    to_ret = [o(preds, gt) for o in metrics]
+    to_ret = [o.cpu().numpy() for o in to_ret]
+
+    config['output'] = to_ret
+    return config
+
+
+@backup_learner_data_decorator
+def make_fold_dnn_report(**config):
+    """
+    Follow Pipeline Process template in pipeline_control_multi.
+    Should be called after report, where config['output'] available
+    :param config:
+    :return: do nothing, just return config, write fold output to text file
+    """
+    to_ret = config['output']
+    print('this fold', to_ret)
+    (config['cp'] / "folds.txt").open('a').write("fold {}: {}\n".format(config.get('test_fold', 0), to_ret))
+    (config['model_path'] / "reports.txt").open('a').write(
+        '{}\thidden:{}\t{}\n'.format(config['cp'],
+                                     'x'.join([str(o) for o in config['dnn_layers']]),
+                                     to_ret))
+    return config
+
+
+@backup_learner_data_decorator
 def make_predict_seg(**config):
     """ make some sample for segmentation return list[(input, output, gt)]. Also save to file """
     print('get (img, gt, pred) and save to config to use later. e.g. slide_bar_show, save to file, viz')
