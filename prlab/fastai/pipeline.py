@@ -25,7 +25,8 @@ from outside.super_resolution.srnet import SRNet3
 from prlab.fastai.image_data import SamplerImageList
 from prlab.fastai.utils import general_configure, base_arch_str_to_obj
 from prlab.fastai.video_data import BalancedLabelImageList
-from prlab.gutils import load_func_by_name, set_if, npy_arr_pretty_print, convert_to_obj_or_fn, encode_and_bind
+from prlab.gutils import load_func_by_name, set_if, npy_arr_pretty_print, convert_to_obj_or_fn, encode_and_bind, \
+    lazy_object_fn_call
 from prlab.torch.functions import fc_exchange_label
 
 
@@ -130,6 +131,19 @@ def learn_general_setup(**config):
 
 
 # ************* model func *******************
+def self_created_model(**config):
+    model = config['model']
+    model = lazy_object_fn_call(model, **config)
+
+    learn = Learner(config['data_train'], model=model, metrics=config['metrics'],
+                    layer_groups=model.layer_groups(),
+                    model_dir=config['cp'])
+
+    config.update({'learn': learn, 'model': learn.model, 'layer_groups': learn.layer_groups})
+
+    return config
+
+
 def basic_model_build(**config):
     """
     Build basic model: vgg, resnet, ...
