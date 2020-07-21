@@ -36,6 +36,13 @@ def set_if(d, k, v, check=None):
 
 
 def convert_to_obj_or_fn(val, **params):
+    """
+    Convert data structure to Class/Fn/Object/Fn call
+    `object` is reverse word to make object or function call
+    :param val: current data to convert
+    :param params: similar global variable e.g. whole dict
+    :return:
+    """
     if isinstance(val, dict):
         return {k: convert_to_obj_or_fn(v, **params) for k, v in val.items()}
     if isinstance(val, list):
