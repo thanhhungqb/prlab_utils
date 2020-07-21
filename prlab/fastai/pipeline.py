@@ -25,7 +25,7 @@ from outside.super_resolution.srnet import SRNet3
 from prlab.fastai.image_data import SamplerImageList
 from prlab.fastai.utils import general_configure, base_arch_str_to_obj
 from prlab.fastai.video_data import BalancedLabelImageList
-from prlab.gutils import load_func_by_name, set_if, npy_arr_pretty_print, convert_to_obj_or_fn
+from prlab.gutils import load_func_by_name, set_if, npy_arr_pretty_print, convert_to_obj_or_fn, encode_and_bind
 from prlab.torch.functions import fc_exchange_label
 
 
@@ -1131,6 +1131,26 @@ def fold_after(**config):
 
 def unfreeze(**config):
     config['learn'].unfreeze()
+    return config
+
+
+def make_one_hot_df_pipe(**config):
+    """
+    Follow Pipeline Process template in `prlab.fastai.pipeline.pipeline_control_multi`.
+    Call after `prlab.medical.data_helper.data_load_df`
+    Update some field in df and make config to work with one-hot
+    :param config:
+    :return:
+    """
+    ndf = encode_and_bind(config['df'], config['cat_names'], keep_old=False)
+    config['df'] = ndf
+
+    # update cat_names to [] and cont_names to all fields (except fold)
+    cont_names = config['df'].select_dtypes(include=[np.number]).columns.tolist()
+    cont_names = [o for o in cont_names if o not in [config['dep_var']]]
+    cont_names = [o for o in cont_names if o != 'fold']  # remove fold if has
+    config['cat_names'], config['cont_names'] = [], cont_names
+
     return config
 
 
