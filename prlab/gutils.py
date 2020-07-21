@@ -35,6 +35,13 @@ def set_if(d, k, v, check=None):
     return d
 
 
+def lazy_object_fn_call(val, **params):
+    """val should be object or object after fn call, if not then convert"""
+    if isinstance(val, (list, tuple, dict, str)):
+        val = convert_to_obj_or_fn(val, lazy=True, **params)
+    return val
+
+
 def convert_to_obj_or_fn(val, lazy=False, **params):
     """
     Convert data structure to Class/Fn/Object/Fn call
