@@ -140,7 +140,8 @@ def self_created_model(**config):
                     model_dir=config['cp'])
 
     config.update({'learn': learn, 'model': learn.model, 'layer_groups': learn.layer_groups})
-
+    (config['cp'] / "model.txt").open('a').write(str(learn.model))
+    
     return config
 
 
