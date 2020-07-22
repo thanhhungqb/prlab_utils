@@ -182,6 +182,10 @@ class MultiDecoderVAE(GeneralVAE):
                                               output_mode=output_mode,
                                               **kwargs)
         self.second_decoder = second_decoder if isinstance(second_decoder, list) else [second_decoder]
+        # second_decoder support lazy calc to make object if not yet
+        self.second_decoder = [lazy_object_fn_call(o, **kwargs) for o in self.second_decoder]
+        self.second_decoder_ = nn.Sequential(*self.second_decoder)  # for store purpose
+
         self.is_sep_sample = is_sep_sample
 
     def layer_groups(self):
