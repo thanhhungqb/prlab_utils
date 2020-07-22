@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from prlab.gutils import convert_to_obj_or_fn, lazy_object_fn_call
+from prlab.gutils import lazy_object_fn_call
 
 
 class DNNEncoder(nn.Module):
@@ -68,21 +68,21 @@ class ExtendedEncoder(nn.Module):
         self.out_dim = out_dim
         self.latent_dim = latent_dim
 
-        # convert base_net to object if not (list, tuple, dict, str)
-        if isinstance(self.base_net, (list, tuple, dict, str)):
-            self.base_net = convert_to_obj_or_fn(self.base_net, lazy=True, **kwargs)
+        # convert base_net to object if not yet, type (list, tuple, dict, str)
+        self.base_net = lazy_object_fn_call(self.base_net, **kwargs)
 
         # make the latent mu and var
         self.mu = nn.Linear(self.out_dim, self.latent_dim)
         self.var = nn.Linear(self.out_dim, self.latent_dim)
 
     def forward(self, *x, **kwargs):
-        base_out = self.base_net(*x)
+        base_out, *other = self.base_net(*x)
         base_out_flat = base_out.view(base_out.size(0), -1)
 
         z_mu = self.mu(base_out_flat)
         z_var = self.var(base_out_flat)
-        return z_mu, z_var, x
+        x_ret = x if len(other) == 0 else other[-1]
+        return z_mu, z_var, x_ret
 
 
 class DNNDecoder(nn.Module):
@@ -147,7 +147,7 @@ class GeneralVAE(nn.Module):
         return [self.encoder, self.decoder]
 
     def forward(self, *x, **kwargs):
-        z_mu, z_var, *_ = self.encoder(*x)
+        z_mu, z_var, *other = self.encoder(*x)
 
         # sample from the distribution having latent parameters z_mu, z_var
         # reparameterize
@@ -158,10 +158,11 @@ class GeneralVAE(nn.Module):
         # decode
         predicted = self.decoder(x_sample)
 
+        x_ret = x if len(other) == 0 else other[-1]
         if self.output_mode is None:
-            return predicted, z_mu, z_var, x
+            return predicted, z_mu, z_var, x_ret
         elif self.output_mode == self.TRAIN_MODE:
-            return predicted, z_mu, z_var, x
+            return predicted, z_mu, z_var, x_ret
         elif self.output_mode == self.TEST_MODE:
             return predicted
         else:
@@ -187,7 +188,7 @@ class MultiDecoderVAE(GeneralVAE):
         return [self.encoder, nn.Sequential(self.decoder, *self.second_decoder)]
 
     def forward(self, *x, **kwargs):
-        z_mu, z_var, *_ = self.encoder(*x)
+        z_mu, z_var, *other = self.encoder(*x)
 
         # sample from the distribution having latent parameters z_mu, z_var
         # reparameterize
@@ -206,10 +207,11 @@ class MultiDecoderVAE(GeneralVAE):
             x_sample = f_sample() if self.is_sep_sample else x_sample
             others.append(dec(x_sample))
 
+        x_ret = x if len(other) == 0 else other[-1]
         if self.output_mode is None:
-            return predicted, z_mu, z_var, others, x
+            return predicted, z_mu, z_var, others, x_ret
         elif self.output_mode == self.TRAIN_MODE:
-            return predicted, z_mu, z_var, others, x
+            return predicted, z_mu, z_var, others, x_ret
         elif self.output_mode == self.TEST_MODE:
             return predicted, others
         else:
