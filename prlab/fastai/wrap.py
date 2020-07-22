@@ -63,3 +63,54 @@ class TabularModelEx(TabularModel):
         if self.y_range is not None:
             x = (self.y_range[1] - self.y_range[0]) * torch.sigmoid(x) + self.y_range[0]
         return x if self.is_only_output else x, embedded_x
+
+
+class SimpleDNN(nn.Module):
+    """
+    Very simple DNN model with custom the deep, number nodes in each layer.
+    """
+
+    def __init__(self, input_size, hidden_size, n_classes,
+                 is_relu=True, dropout=None,
+                 use_bn=True, bn_final=False,
+                 **kwargs):
+        """
+        :param input_size: the input dimension
+        :param hidden_size: int or [int], nodes in hidden layer(s)
+        :param n_classes: the output dimension
+        :param is_relu: if use relu after each hidden layer
+        """
+        super(SimpleDNN, self).__init__()
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        self.n_classes = n_classes
+
+        self.hidden_size = self.hidden_size if isinstance(self.hidden_size, list) else [self.hidden_size]
+        if len(self.hidden_size) == 0: raise Exception("hidden_size should be not empty list")
+
+        self.is_relu = listify(is_relu, self.hidden_size)
+        self.dropout = listify(dropout, self.hidden_size)
+        self.use_bn = listify(use_bn, self.hidden_size)
+        self.bn_final = bn_final
+
+        seq = []
+        prev = self.input_size
+        # seq.append(nn.ReLU()) if self.is_relu else None
+        # layers.append(nn.BatchNorm1d(self.hidden_size[0])) if self.use_bn else None
+
+        for pos, (n_nodes, is_relu, is_bn, drop, *_) in enumerate(
+                zip(self.hidden_size, self.is_relu, self.use_bn, self.dropout)):
+            seq.append(nn.Linear(prev, n_nodes))
+            seq.append(nn.ReLU()) if is_relu else None
+            seq.append(nn.BatchNorm1d(n_nodes)) if is_bn else None
+            seq.append(nn.Dropout(p=drop)) if drop is not None else None
+
+            prev = n_nodes
+
+        seq.append(nn.Linear(self.hidden_size[-1], self.n_classes))
+        seq.append(nn.BatchNorm1d(self.n_classes)) if self.bn_final else None
+
+        self.seq = nn.Sequential(*seq)
+
+    def forward(self, *x):
+        return self.seq(*x)
