@@ -121,6 +121,7 @@ class DNNDecoder(nn.Module):
     def forward(self, x, **kwargs):
         hidden_val = self.hiddens(x)
         output = self.output_layer(hidden_val)
+        output = torch.sigmoid(output)
         return output
 
 
