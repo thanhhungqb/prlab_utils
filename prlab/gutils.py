@@ -35,7 +35,23 @@ def set_if(d, k, v, check=None):
     return d
 
 
-def convert_to_obj_or_fn(val, **params):
+def lazy_object_fn_call(val, **params):
+    """val should be object or object after fn call, if not then convert"""
+    if isinstance(val, (list, tuple, dict, str)):
+        val = convert_to_obj_or_fn(val, lazy=True, **params)
+    return val
+
+
+def convert_to_obj_or_fn(val, lazy=False, **params):
+    """
+    Convert data structure to Class/Fn/Object/Fn call
+    `object` is reversed word to make object or function call
+    `object_lazy` is reversed word to make object/fn when needed (lazy)
+    :param val: current data to convert
+    :param lazy: true/false, true if run in the lazy mode, false if in fresh mode, e.g. at beginning
+    :param params: similar global variable e.g. whole dict
+    :return:
+    """
     if isinstance(val, dict):
         return {k: convert_to_obj_or_fn(v, **params) for k, v in val.items()}
     if isinstance(val, list):
@@ -43,6 +59,10 @@ def convert_to_obj_or_fn(val, **params):
         # because object is reverse word, and never use to function or class, safe to use here to mark
         if len(val) > 1 and val[0] == "object":
             return convert_to_obj_or_fn(tuple(val[1:]), **params)
+        # some object/fn just call when needed (or at special time when all params available)
+        # simply keep as it to use later
+        if len(val) > 1 and val[0] == "object_lazy":
+            return convert_to_obj_or_fn(tuple(val[1:]), **params) if lazy else val
         return [convert_to_obj_or_fn(o, **params) for o in val]
 
     if isinstance(val, tuple):
