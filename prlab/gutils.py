@@ -70,7 +70,7 @@ def convert_to_obj_or_fn(val, lazy=False, **params):
         call_class = load_func_by_name(val[0])[0]
         new_params = {}
         new_params.update(params)
-        new_params.update(val[-1])
+        new_params.update(convert_to_obj_or_fn(val[-1], **params))
         return call_class(**new_params)
 
     if isinstance(val, str):
