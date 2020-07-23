@@ -20,7 +20,8 @@ from torch.autograd import Variable
 from torch.nn.functional import log_softmax
 
 from outside.scikit.plot_confusion_matrix import plot_confusion_matrix
-from prlab.gutils import convert_to_obj, make_check_point_folder, convert_to_obj_or_fn, load_func_by_name
+from prlab.gutils import convert_to_obj, make_check_point_folder, convert_to_obj_or_fn, load_func_by_name, \
+    lazy_object_fn_call
 from prlab.torch.functions import ExLoss, weights_branches
 
 
@@ -524,6 +525,24 @@ def dice_loss(input, target):
     dice_total = 1 - torch.sum(dice_eso) / dice_eso.size(0)  # divide by batch_sz
 
     return dice_total
+
+
+class VAEJoinTaskMetric:
+    """
+    metric for VAE join task.
+    the first output of VAE is for unsupervised, second output should be get to calc
+    """
+    __name__ = 'VAEJoinTaskMetric'
+
+    def __init__(self, base_metric=None, **config):
+        self.base_metrics = base_metric if base_metric is not None else accuracy
+        self.base_metrics = lazy_object_fn_call(self.base_metrics, **config)
+
+    def __call__(self, pred, target, *args, **kwargs):
+        _, _, _, *o = pred
+        others = o[0]
+        c_out = others[0]
+        return self.base_metrics(c_out, target)
 
 
 def test_image_summary(learn, data_test=None, scale=1.1, is_normalize=True, monitor_func=accuracy, k_tta=3,
