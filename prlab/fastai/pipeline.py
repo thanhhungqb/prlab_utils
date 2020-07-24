@@ -87,8 +87,8 @@ def pipeline_control_multi(**kwargs):
         convert_to_obj_or_fn(config[pipe_name])
 
     for pipe_name in ordered_pipeline_names:
-        # TODO in case the previous output config should affect the next step
-        # of the pipeline, then convert_to_obj_or_fn should be call after previous step done.
+        # the previous output config may be affect the next step of the pipeline,
+        # then convert_to_obj_or_fn should be call after previous step done.
         process_pipeline = convert_to_obj_or_fn(config[pipe_name])
         for fn in process_pipeline:
             config = fn(**config)
