@@ -76,6 +76,11 @@ def pipeline_control_multi(**kwargs):
         # support old version of configure file
         ordered_pipeline_names = ['process_pipeline']
 
+    # TODO
+    #   Do we need object create and call here, if then lazy should be consider for all pipe
+    #   then local and global params should be careful consider
+    #   for lazy load, another problem with module load at runtime also have to care because
+    #   some case, source code are remove immediately after main process run
     # this step to make sure all name could be convert to function to call later
     # this is early check
     for pipe_name in ordered_pipeline_names:
@@ -141,7 +146,7 @@ def self_created_model(**config):
 
     config.update({'learn': learn, 'model': learn.model, 'layer_groups': learn.layer_groups})
     (config['cp'] / "model.txt").open('a').write(str(learn.model))
-    
+
     return config
 
 
