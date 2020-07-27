@@ -106,7 +106,6 @@ def model_build(**config):
     """
     model_func, _ = load_func_by_name(config['model_func'])
     learn, layer_groups, *_ = model_func(**config)
-    (config['cp'] / "model.txt").open('a').write(str(learn.model))
     config.update({
         'model': learn.model, 'layer_groups': layer_groups, 'learn': learn
     })
@@ -132,6 +131,8 @@ def learn_general_setup(**config):
     if config.get('layer_groups', None) is not None:
         learn.layer_groups = config['layer_groups']
 
+    (config['cp'] / "model.txt").open('a').write(str(learn.model))
+
     return config
 
 
@@ -145,7 +146,6 @@ def self_created_model(**config):
                     model_dir=config['cp'])
 
     config.update({'learn': learn, 'model': learn.model, 'layer_groups': learn.layer_groups})
-    (config['cp'] / "model.txt").open('a').write(str(learn.model))
 
     return config
 
@@ -181,7 +181,6 @@ def tabular_dnn_learner_build(**config):
     config.update({
         'learn': learn, 'model': learn.model, 'layer_groups': learn.layer_groups
     })
-    (config['cp'] / "model.txt").open('w').write(str(learn.model))
 
     return config
 
@@ -208,7 +207,6 @@ def create_obj_model(**config):
                     opt_func=opt,
                     layer_groups=layer_groups,
                     model_dir=config['cp'])
-    (config['cp'] / "model.txt").open('a').write(str(learn.model))
 
     config.update({
         'learn': learn,
