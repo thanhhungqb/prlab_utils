@@ -539,7 +539,7 @@ class VAEJoinTaskMetric:
         self.base_metrics = lazy_object_fn_call(self.base_metrics, **config)
 
     def __call__(self, pred, target, *args, **kwargs):
-        _, _, _, *o = pred
+        _, _, _, *o = pred if isinstance(pred, tuple) else (None, None, None, [pred])
         others = o[0]
         c_out = others[0]
         return self.base_metrics(c_out, target)
