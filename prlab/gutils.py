@@ -518,7 +518,8 @@ def run_k_fold(ctx, run_id, json_conf):
     out = []
     k_start = config.get('k_start', 0)
     for fold in range(k_start, config['k'] + k_start):
-        out.append(fn(fold=fold, **config))
+        config.update({'fold': fold})
+        out.append(fn(**config))
         # support for dict['output'], correctly follow the template
         if isinstance(out[-1], dict):
             out[-1] = out[-1]['output']
