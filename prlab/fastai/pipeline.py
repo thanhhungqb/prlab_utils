@@ -1155,7 +1155,7 @@ def unfreeze(**config):
 def make_one_hot_df_pipe(**config):
     """
     Follow Pipeline Process template in `prlab.fastai.pipeline.pipeline_control_multi`.
-    Consider to use `prlab.medical.data_helper.make_one_hot_df`, two pipe have similar idea but different implement,
+    Consider to REPLACE `prlab.medical.data_helper.make_one_hot_df`, two pipe have similar idea but different implement,
     this implement try to general case of tabular.
     Call after `prlab.medical.data_helper.data_load_df`
     Update some field in df and make config to work with one-hot
@@ -1166,9 +1166,15 @@ def make_one_hot_df_pipe(**config):
     config['df'] = ndf
 
     # update cat_names to [] and cont_names to all fields (except fold)
-    cont_names = config['df'].select_dtypes(include=[np.number]).columns.tolist()
-    cont_names = [o for o in cont_names if o not in [config['dep_var']]]
-    cont_names = [o for o in cont_names if o != 'fold']  # remove fold if has
+    cont_names = config['cont_names']
+
+    # new columns from cat_names that made in encode_and_bind
+    # the new names will be COLNAME_{VALUE}
+    all_col_names = config['df'].select_dtypes(include=[np.number]).columns.tolist()
+    new_cols_names = [name for name in all_col_names if
+                      np.any(["{}_".format(cat_name) in name for cat_name in config['cat_names']])]
+    cont_names.extend(new_cols_names)
+
     config['cat_names'], config['cont_names'] = [], cont_names
 
     return config
