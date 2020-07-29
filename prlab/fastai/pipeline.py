@@ -1155,6 +1155,8 @@ def unfreeze(**config):
 def make_one_hot_df_pipe(**config):
     """
     Follow Pipeline Process template in `prlab.fastai.pipeline.pipeline_control_multi`.
+    Consider to use `prlab.medical.data_helper.make_one_hot_df`, two pipe have similar idea but different implement,
+    this implement try to general case of tabular.
     Call after `prlab.medical.data_helper.data_load_df`
     Update some field in df and make config to work with one-hot
     :param config:
