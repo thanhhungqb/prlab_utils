@@ -70,7 +70,7 @@ def convert_to_obj_or_fn(val, lazy=False, **params):
         call_class = load_func_by_name(val[0])[0]
         new_params = {}
         new_params.update(params)
-        new_params.update(val[-1])
+        new_params.update(convert_to_obj_or_fn(val[-1], **params))
         return call_class(**new_params)
 
     if isinstance(val, str):
@@ -518,7 +518,8 @@ def run_k_fold(ctx, run_id, json_conf):
     out = []
     k_start = config.get('k_start', 0)
     for fold in range(k_start, config['k'] + k_start):
-        out.append(fn(fold=fold, **config))
+        config.update({'fold': fold})
+        out.append(fn(**config))
         # support for dict['output'], correctly follow the template
         if isinstance(out[-1], dict):
             out[-1] = out[-1]['output']

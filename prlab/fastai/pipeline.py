@@ -76,14 +76,19 @@ def pipeline_control_multi(**kwargs):
         # support old version of configure file
         ordered_pipeline_names = ['process_pipeline']
 
+    # TODO
+    #   Do we need object create and call here, if then lazy should be consider for all pipe
+    #   then local and global params should be careful consider
+    #   for lazy load, another problem with module load at runtime also have to care because
+    #   some case, source code are remove immediately after main process run
     # this step to make sure all name could be convert to function to call later
     # this is early check
     for pipe_name in ordered_pipeline_names:
         convert_to_obj_or_fn(config[pipe_name])
 
     for pipe_name in ordered_pipeline_names:
-        # TODO in case the previous output config should affect the next step
-        # of the pipeline, then convert_to_obj_or_fn should be call after previous step done.
+        # the previous output config may be affect the next step of the pipeline,
+        # then convert_to_obj_or_fn should be call after previous step done.
         process_pipeline = convert_to_obj_or_fn(config[pipe_name])
         for fn in process_pipeline:
             config = fn(**config)
@@ -101,7 +106,6 @@ def model_build(**config):
     """
     model_func, _ = load_func_by_name(config['model_func'])
     learn, layer_groups, *_ = model_func(**config)
-    (config['cp'] / "model.txt").open('a').write(str(learn.model))
     config.update({
         'model': learn.model, 'layer_groups': layer_groups, 'learn': learn
     })
@@ -127,6 +131,8 @@ def learn_general_setup(**config):
     if config.get('layer_groups', None) is not None:
         learn.layer_groups = config['layer_groups']
 
+    (config['cp'] / "model.txt").open('a').write(str(learn.model))
+
     return config
 
 
@@ -140,8 +146,7 @@ def self_created_model(**config):
                     model_dir=config['cp'])
 
     config.update({'learn': learn, 'model': learn.model, 'layer_groups': learn.layer_groups})
-    (config['cp'] / "model.txt").open('a').write(str(learn.model))
-    
+
     return config
 
 
@@ -176,7 +181,6 @@ def tabular_dnn_learner_build(**config):
     config.update({
         'learn': learn, 'model': learn.model, 'layer_groups': learn.layer_groups
     })
-    (config['cp'] / "model.txt").open('w').write(str(learn.model))
 
     return config
 
@@ -203,7 +207,6 @@ def create_obj_model(**config):
                     opt_func=opt,
                     layer_groups=layer_groups,
                     model_dir=config['cp'])
-    (config['cp'] / "model.txt").open('a').write(str(learn.model))
 
     config.update({
         'learn': learn,
@@ -1152,6 +1155,8 @@ def unfreeze(**config):
 def make_one_hot_df_pipe(**config):
     """
     Follow Pipeline Process template in `prlab.fastai.pipeline.pipeline_control_multi`.
+    Consider to REPLACE `prlab.medical.data_helper.make_one_hot_df`, two pipe have similar idea but different implement,
+    this implement try to general case of tabular.
     Call after `prlab.medical.data_helper.data_load_df`
     Update some field in df and make config to work with one-hot
     :param config:
@@ -1161,12 +1166,45 @@ def make_one_hot_df_pipe(**config):
     config['df'] = ndf
 
     # update cat_names to [] and cont_names to all fields (except fold)
-    cont_names = config['df'].select_dtypes(include=[np.number]).columns.tolist()
-    cont_names = [o for o in cont_names if o not in [config['dep_var']]]
-    cont_names = [o for o in cont_names if o != 'fold']  # remove fold if has
+    cont_names = config['cont_names']
+
+    # new columns from cat_names that made in encode_and_bind
+    # the new names will be COLNAME_{VALUE}
+    all_col_names = config['df'].select_dtypes(include=[np.number]).columns.tolist()
+    new_cols_names = [name for name in all_col_names if
+                      np.any(["{}_".format(cat_name) in name for cat_name in config['cat_names']])]
+    cont_names.extend(new_cols_names)
+
     config['cat_names'], config['cont_names'] = [], cont_names
 
     return config
+
+
+class PipeClassWrap:
+    """
+    Convert/Wrap pipe function to class style.
+    Note that class style can be easy to use with object or object_lazy with the custom params
+    Usage:
+
+        def function(**kwargs):
+            print("GeeksforGeeks")
+            print(kwargs)
+
+        obj = PipeClassWrap(fn=function,test='a',o='b')
+        obj(test='override')
+    """
+
+    def __init__(self, fn, **config):
+        self.fn = lazy_object_fn_call(fn, **config)
+        self.config = config
+
+    def __call__(self, *args, **kwargs):
+        # update and override with stored config
+        params = {}
+        params.update(self.config)
+        params.update(kwargs)
+
+        return self.fn(*args, **params)
 
 
 # define some popular pipe that can be widely use
