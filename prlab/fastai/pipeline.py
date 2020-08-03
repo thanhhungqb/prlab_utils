@@ -1180,6 +1180,33 @@ def make_one_hot_df_pipe(**config):
     return config
 
 
+class PipeClassWrap:
+    """
+    Convert/Wrap pipe function to class style.
+    Note that class style can be easy to use with object or object_lazy with the custom params
+    Usage:
+
+        def function(**kwargs):
+            print("GeeksforGeeks")
+            print(kwargs)
+
+        obj = PipeClassWrap(fn=function,test='a',o='b')
+        obj(test='override')
+    """
+
+    def __init__(self, fn, **config):
+        self.fn = lazy_object_fn_call(fn, **config)
+        self.config = config
+
+    def __call__(self, *args, **kwargs):
+        # update and override with stored config
+        params = {}
+        params.update(self.config)
+        params.update(kwargs)
+
+        return self.fn(*args, **params)
+
+
 # define some popular pipe that can be widely use
 default_conf_pipeline = {
     'process_pipeline_2': [
