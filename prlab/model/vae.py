@@ -178,6 +178,7 @@ class MultiDecoderVAE(GeneralVAE):
     def __init__(self, encoder, decoder, output_mode=None,
                  second_decoder=[],
                  is_sep_sample=True,
+                 is_testing=False,
                  **kwargs):
         super(MultiDecoderVAE, self).__init__(encoder=encoder, decoder=decoder,
                                               output_mode=output_mode,
@@ -188,6 +189,7 @@ class MultiDecoderVAE(GeneralVAE):
         self.second_decoder_ = nn.Sequential(*self.second_decoder)  # for store purpose
 
         self.is_sep_sample = is_sep_sample
+        self.is_testing = is_testing
 
     def layer_groups(self):
         return [self.encoder, nn.Sequential(self.decoder, *self.second_decoder)]
@@ -213,6 +215,10 @@ class MultiDecoderVAE(GeneralVAE):
             others.append(dec(x_sample))
 
         x_ret = x if len(other) == 0 else other[-1]
+        if self.is_testing and len(others) > 0:
+            # TODO when more than one others? Fastai does not support tuple or list when TTA, preds
+            return others[0]
+
         if self.output_mode is None:
             return predicted, z_mu, z_var, others, x_ret
         elif self.output_mode == self.TRAIN_MODE:
