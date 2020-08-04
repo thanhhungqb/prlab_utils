@@ -62,7 +62,7 @@ class TabularModelEx(TabularModel):
         x = self.layers(x)
         if self.y_range is not None:
             x = (self.y_range[1] - self.y_range[0]) * torch.sigmoid(x) + self.y_range[0]
-        return x if self.is_only_output else x, embedded_x
+        return x if self.is_only_output else (x, embedded_x)
 
 
 class SimpleDNN(nn.Module):
