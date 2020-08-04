@@ -106,6 +106,8 @@ class DNNDecoder(nn.Module):
         self.is_relu = is_relu
 
         self.seqs = [nn.Linear(self.latent_dim, self.hidden_dim[0])]
+        if self.is_relu:
+            self.seqs.append(nn.ReLU(inplace=False))
         for pos in range(1, len(self.hidden_dim)):
             current_hidden_size = self.hidden_dim[pos]
             previous_hidden_size = self.hidden_dim[pos - 1]
