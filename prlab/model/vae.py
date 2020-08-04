@@ -229,3 +229,13 @@ class MultiDecoderVAE(GeneralVAE):
             return predicted, others
         else:
             raise Exception("Wrong output_mode, please have a check, it should be None/Train(1)/Test(2)")
+
+    def sample(self, latent_dim):
+        """
+        Sample from random of latent
+        :return:
+        """
+        device = next(self.parameters()).device
+        x_sample = torch.randn(1, latent_dim).to(device)
+        predicted = self.decoder(x_sample)
+        return predicted
