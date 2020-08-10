@@ -544,6 +544,9 @@ class VAEJoinTaskMetric:
         c_out = others[0]
         return self.base_metrics(c_out, target)
 
+    def __repr__(self):
+        return "VAEJoinTaskMetric with base_metrics ({})".format(str(self.base_metrics))
+
 
 def test_image_summary(learn, data_test=None, scale=1.1, is_normalize=True, monitor_func=accuracy, k_tta=3,
                        is_plt=True):
