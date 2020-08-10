@@ -132,6 +132,7 @@ def learn_general_setup(**config):
         learn.layer_groups = config['layer_groups']
 
     (config['cp'] / "model.txt").open('a').write(str(learn.model))
+    (config['cp'] / "model.txt").open('a').write("\n".join([str(learn.metrics), str(learn.loss_func)]))
 
     return config
 
