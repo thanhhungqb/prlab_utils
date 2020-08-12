@@ -396,7 +396,14 @@ def load_func_by_name(func_str):
         # for related form .fn
         mod_name = __name__
 
-    mod = importlib.import_module(mod_name)
+    try:
+        mod = importlib.import_module(mod_name)
+    except:
+        # case of module.class.fn or module.class.var
+        mod1, fn1 = mod_name.rsplit('.', 1)
+        mod = importlib.import_module(mod1)
+        mod = getattr(mod, fn1)
+
     func = getattr(mod, func_name)
     return func, mod
 
