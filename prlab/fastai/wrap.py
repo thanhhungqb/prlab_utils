@@ -55,14 +55,15 @@ class TabularModelEx(TabularModel):
             x = torch.cat(x, 1)
             x = self.emb_drop(x)
         if self.n_cont != 0:
-            x_cont = self.bn_cont(x_cont)
+            # x_cont = self.bn_cont(x_cont)
+            # TODO fix problem, value to be large when use bn, think about use embedded_x without bn
             x = torch.cat([x, x_cont], 1) if self.n_emb != 0 else x_cont
 
         embedded_x = x
         x = self.layers(x)
         if self.y_range is not None:
             x = (self.y_range[1] - self.y_range[0]) * torch.sigmoid(x) + self.y_range[0]
-        return x if self.is_only_output else x, embedded_x
+        return x if self.is_only_output else (x, embedded_x)
 
 
 class SimpleDNN(nn.Module):
@@ -71,7 +72,7 @@ class SimpleDNN(nn.Module):
     """
 
     def __init__(self, input_size, hidden_size, n_classes,
-                 is_relu=True, dropout=None,
+                 is_relu=True, dropout=[None],
                  use_bn=True, bn_final=False,
                  **kwargs):
         """

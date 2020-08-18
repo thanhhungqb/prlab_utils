@@ -132,6 +132,8 @@ def learn_general_setup(**config):
         learn.layer_groups = config['layer_groups']
 
     (config['cp'] / "model.txt").open('a').write(str(learn.model))
+    (config['cp'] / "model.txt").open('a').write(
+        "\n".join([str(learn.metrics), str(learn.loss_func), str(learn.callback_fns)]))
 
     return config
 
@@ -140,9 +142,10 @@ def learn_general_setup(**config):
 def self_created_model(**config):
     model = config['model']
     model = lazy_object_fn_call(model, **config)
+    layer_groups = model.layer_groups() if hasattr(model, 'layer_groups') else [model]
 
     learn = Learner(config['data_train'], model=model, metrics=config['metrics'],
-                    layer_groups=model.layer_groups(),
+                    layer_groups=layer_groups,
                     model_dir=config['cp'])
 
     config.update({'learn': learn, 'model': learn.model, 'layer_groups': learn.layer_groups})
@@ -872,6 +875,28 @@ def make_report_simple(**config):
     to_ret = [o.cpu().numpy() for o in to_ret]
 
     config['output'] = to_ret
+    return config
+
+
+@backup_learner_data_decorator
+def predict_and_save_simple(**config):
+    """
+    Follow Pipeline Process template in `prlab.fastai.pipeline.pipeline_control_multi`.
+    :param config:
+    :return: new config with output
+    """
+    learn = config['learn']
+    cp = config['cp']
+    preds, gt = learn.get_preds(DatasetType.Valid)
+
+    preds_npy, gt_npy = preds.numpy(), gt.numpy()
+
+    items = np.array([str(o) for o in config['data_test'].valid_ds.items])
+    to_save = {'ys': preds_npy, 'y': gt_npy, 'items': items}
+
+    np.save(cp / "result-raw", to_save)
+    print(preds_npy[:10])
+
     return config
 
 
