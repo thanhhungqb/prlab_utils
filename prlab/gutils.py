@@ -47,6 +47,7 @@ def convert_to_obj_or_fn(val, lazy=False, **params):
     Convert data structure to Class/Fn/Object/Fn call
     `object` is reversed word to make object or function call
     `object_lazy` is reversed word to make object/fn when needed (lazy)
+    coding style: class name should be start with UPPER letter
     :param val: current data to convert
     :param lazy: true/false, true if run in the lazy mode, false if in fresh mode, e.g. at beginning
     :param params: similar global variable e.g. whole dict
@@ -70,15 +71,54 @@ def convert_to_obj_or_fn(val, lazy=False, **params):
         call_class = load_func_by_name(val[0])[0]
         new_params = {}
         new_params.update(params)
+        # TODO bug:
+        #   in some cases, val[-1] contains some string like class/func (e.g. a.b.c) but want to keep this form
+        #   instead convert to object/func
         new_params.update(convert_to_obj_or_fn(val[-1], **params))
         return call_class(**new_params)
 
     if isinstance(val, str):
         if val.rsplit('.', 1)[-1][0].isupper():  # this is class, then call to make object
+            if val.rsplit('.', 1)[-1].isupper():  # all letter in name upper then constant, e.g. variable, lambda func
+                return load_func_by_name(val)[0]
             return load_func_by_name(val)[0](**params)
         else:
             return load_func_by_name(val)[0]
     return val
+
+
+def check_convert_to_obj_or_fn(val, level=0, **params):
+    """
+    Similar to `prlab.gutils.convert_to_obj_or_fn` but just check to make sure module and class/function available.
+    'object', 'object_lazy' is reversed words
+    :param val: current data to convert
+    :param params: similar global variable e.g. whole dict
+    :return:
+    """
+    if isinstance(val, dict):
+        [check_convert_to_obj_or_fn(v, **params) for _, v in val.items()]
+
+    if isinstance(val, list):
+        # ["object", class_name, dict] reverse for object make (as tuple below)
+        # because object is reverse word, and never use to function or class, safe to use here to mark
+        if len(val) > 1 and val[0] in ["object", "object_lazy"]:
+            check_convert_to_obj_or_fn(tuple(val[1:]), **params)
+        else:
+            [check_convert_to_obj_or_fn(o, **params) for o in val]
+
+    if isinstance(val, tuple):
+        # object make (class_name, dict), omit form (class_name, params, dict*), len=2
+        assert len(val) == 2
+
+        call_class = load_func_by_name(val[0])[0]
+        assert not isinstance(call_class, str)  # must be object
+        # TODO bug: similar as `convert_to_obj_or_fn`
+        check_convert_to_obj_or_fn(val[-1], level=level + 1, **params)
+
+    if isinstance(val, str):
+        # TODO how about str
+        if level == 0:
+            assert not isinstance(load_func_by_name(val)[0], str)
 
 
 def convert_to_obj(val, **params):
@@ -356,7 +396,14 @@ def load_func_by_name(func_str):
         # for related form .fn
         mod_name = __name__
 
-    mod = importlib.import_module(mod_name)
+    try:
+        mod = importlib.import_module(mod_name)
+    except:
+        # case of module.class.fn or module.class.var
+        mod1, fn1 = mod_name.rsplit('.', 1)
+        mod = importlib.import_module(mod1)
+        mod = getattr(mod, fn1)
+
     func = getattr(mod, func_name)
     return func, mod
 

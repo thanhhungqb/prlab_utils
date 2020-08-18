@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from torch.nn import functional as F
 
 from prlab.gutils import lazy_object_fn_call
 
@@ -79,6 +80,8 @@ class ExtendedEncoder(nn.Module):
         base_out, *other = self.base_net(*x)
         base_out_flat = base_out.view(base_out.size(0), -1)
 
+        base_out_flat = F.relu(base_out_flat)
+
         z_mu = self.mu(base_out_flat)
         z_var = self.var(base_out_flat)
         x_ret = x if len(other) == 0 else other[-1]
@@ -106,6 +109,8 @@ class DNNDecoder(nn.Module):
         self.is_relu = is_relu
 
         self.seqs = [nn.Linear(self.latent_dim, self.hidden_dim[0])]
+        if self.is_relu:
+            self.seqs.append(nn.ReLU(inplace=False))
         for pos in range(1, len(self.hidden_dim)):
             current_hidden_size = self.hidden_dim[pos]
             previous_hidden_size = self.hidden_dim[pos - 1]
@@ -117,11 +122,12 @@ class DNNDecoder(nn.Module):
         self.hiddens = nn.Sequential(*self.seqs)
 
         self.output_layer = nn.Linear(self.hidden_dim[-1], self.output_dim)
+        self.last = nn.Sigmoid() if kwargs.get('is_sigmoid_last', True) else None
 
     def forward(self, x, **kwargs):
         hidden_val = self.hiddens(x)
         output = self.output_layer(hidden_val)
-        output = torch.sigmoid(output)
+        output = self.last(output) if self.last is not None else output
         return output
 
 
@@ -227,3 +233,13 @@ class MultiDecoderVAE(GeneralVAE):
             return predicted, others
         else:
             raise Exception("Wrong output_mode, please have a check, it should be None/Train(1)/Test(2)")
+
+    def sample(self, latent_dim):
+        """
+        Sample from random of latent
+        :return:
+        """
+        device = next(self.parameters()).device
+        x_sample = torch.randn(1, latent_dim).to(device)
+        predicted = self.decoder(x_sample)
+        return predicted
