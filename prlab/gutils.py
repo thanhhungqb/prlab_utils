@@ -649,7 +649,7 @@ def npy_arr_pretty_print(npy_arr, fm='{:.4f}'):
     :param fm: format string, default is for 4 digits float
     :return:
     """
-    if isinstance(npy_arr, (np.float, np.float64, np.int, np.int64)):
+    if isinstance(npy_arr, (np.float, np.float64, np.int, np.int64, np.int16)):
         return fm.format(npy_arr)
     if isinstance(npy_arr, (int, float)):
         return fm.format(npy_arr)
