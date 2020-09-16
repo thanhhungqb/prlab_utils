@@ -325,6 +325,27 @@ def get_folder_level(root_path, depth=1):
     return all_level
 
 
+def best_match_path(path_list, name):
+    """
+    Find the best match of name in path_list.
+    Wide use when name is an ID and ID are a part of Path name, e.g. CT_$name, $name.npy
+    TODO now simple implement check name is in part (full name)
+    :param path_list:
+    :param name:
+    :return:
+    """
+    candidate = []
+    for o in path_list:
+        if name in str(o):
+            candidate.append(o)
+
+    if len(candidate) == 0:
+        return None
+    if len(candidate) == 1:
+        return candidate[0]
+    return candidate[0]
+
+
 def load_df_img_data(path, index_keys='filename', bb_key='bb'):
     """
     Load DataFrame from csv that has filename as index and bb
