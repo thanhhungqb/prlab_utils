@@ -304,6 +304,27 @@ def get_file_rec(path):
     return files
 
 
+def get_folder_level(root_path, depth=1):
+    """
+    return all folder, sub-folder with depth
+    :param root_path:
+    :param depth: 1 for current folder only, 2 for all folder in sub-folder of current
+    :return: [Path]
+    """
+    p = Path(root_path)
+    curr_level = [p]
+    all_level = [p]
+    for level in range(depth):
+        next_level = []
+        for xp in curr_level:
+            next_level.extend([o for o in xp.iterdir() if o.is_dir()])
+
+        all_level.extend(next_level)
+        curr_level = next_level
+
+    return all_level
+
+
 def load_df_img_data(path, index_keys='filename', bb_key='bb'):
     """
     Load DataFrame from csv that has filename as index and bb
