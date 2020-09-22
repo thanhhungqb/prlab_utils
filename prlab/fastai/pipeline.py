@@ -1232,6 +1232,20 @@ class PipeClassWrap:
         return self.fn(*args, **params)
 
 
+class PipeClassCallWrap:
+    """
+    Wrap a function call with return to a pipe call with update configure
+    """
+
+    def __init__(self, fn, ret_name='out', **config):
+        self.fn = lazy_object_fn_call(fn, **config)
+        self.ret_name = ret_name
+
+    def __call__(self, *args, **config):
+        config[self.ret_name] = self.fn(*args, **config)
+        return config
+
+
 # define some popular pipe that can be widely use
 default_conf_pipeline = {
     'process_pipeline_2': [
