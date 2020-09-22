@@ -78,12 +78,16 @@ def convert_to_obj_or_fn(val, lazy=False, **params):
         return call_class(**new_params)
 
     if isinstance(val, str):
-        if val.rsplit('.', 1)[-1][0].isupper():  # this is class, then call to make object
-            if val.rsplit('.', 1)[-1].isupper():  # all letter in name upper then constant, e.g. variable, lambda func
+        try:
+            if val.rsplit('.', 1)[-1][0].isupper():  # this is class, then call to make object
+                if val.rsplit('.', 1)[-1].isupper():
+                    # all letter in name upper then constant, e.g. variable, lambda func
+                    return load_func_by_name(val)[0]
+                return load_func_by_name(val)[0](**params)
+            else:
                 return load_func_by_name(val)[0]
-            return load_func_by_name(val)[0](**params)
-        else:
-            return load_func_by_name(val)[0]
+        except:
+            return val  # just normal str, not class or function
     return val
 
 
