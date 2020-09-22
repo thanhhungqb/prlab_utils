@@ -823,6 +823,22 @@ def merge_xlsx(files, merged_file=None):
     return merged_df
 
 
+class NameSpaceDict(dict):
+    def __init__(self, *arg, **kw):
+        super().__init__(*arg, **kw)
+        self.pkey = 'parent'
+
+    def get(self, k, d=None):
+        ret = super().get(k, d=None)
+        if ret is not None:
+            return ret
+        # get from parent if have
+        if isinstance(super.get(self.pkey), dict):
+            return super.get(self.pkey).get(k, d)
+
+        return d
+
+
 def test_make_check_point_folder():
     print(make_check_point_folder("/tmp"))
 
