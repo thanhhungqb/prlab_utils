@@ -28,7 +28,7 @@ from prlab.fastai.video_data import BalancedLabelImageList
 from prlab.gutils import load_func_by_name, set_if, npy_arr_pretty_print, convert_to_obj_or_fn, encode_and_bind, \
     lazy_object_fn_call
 from prlab.torch.functions import fc_exchange_label
-
+from prlab.popularlib import *
 
 def pipeline_control(**kwargs):
     """
@@ -1239,6 +1239,7 @@ class PipeClassCallWrap:
 
     def __init__(self, fn, ret_name='out', params=None, map_name=None, **config):
         self.fn = lazy_object_fn_call(fn, **config)
+        self.fn = self.fn if callable(self.fn) else eval(self.fn)
         self.ret_name = ret_name
         self.params = params if params is not None else {}
         self.map_param_name = {} if map_name is None else map_name
