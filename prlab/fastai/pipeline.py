@@ -1237,12 +1237,15 @@ class PipeClassCallWrap:
     Wrap a function call with return to a pipe call with update configure
     """
 
-    def __init__(self, fn, ret_name='out', **config):
+    def __init__(self, fn, ret_name='out', params=None, map_name=None, **config):
         self.fn = lazy_object_fn_call(fn, **config)
         self.ret_name = ret_name
+        self.params = params if params is not None else {}
+        self.map_param_name = {} if map_name is None else map_name
 
     def __call__(self, *args, **config):
-        config[self.ret_name] = self.fn(*args, **config)
+        new_params = {k: config.get(v) for k, v in self.map_param_name.items()}
+        config[self.ret_name] = self.fn(*args, **{**config, **self.params, **new_params})
         return config
 
 
