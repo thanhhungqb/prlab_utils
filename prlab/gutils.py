@@ -843,6 +843,12 @@ class NameSpaceDict(dict):
         return d
 
 
+# some normalization function
+normalize_norm = lambda slices, **kw: (slices - slices.mean()) / slices.std()
+normalize_0_1 = lambda slices, **kw: (slices - slices.min()) / (slices.max() - slices.min())
+normalize_n1_1 = lambda slices, **kw: (slices * 2 - slices.max() - slices.min()) / (slices.max() - slices.min())
+
+
 def test_make_check_point_folder():
     print(make_check_point_folder("/tmp"))
 
