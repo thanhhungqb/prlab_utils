@@ -78,12 +78,16 @@ def convert_to_obj_or_fn(val, lazy=False, **params):
         return call_class(**new_params)
 
     if isinstance(val, str):
-        if val.rsplit('.', 1)[-1][0].isupper():  # this is class, then call to make object
-            if val.rsplit('.', 1)[-1].isupper():  # all letter in name upper then constant, e.g. variable, lambda func
+        try:
+            if val.rsplit('.', 1)[-1][0].isupper():  # this is class, then call to make object
+                if val.rsplit('.', 1)[-1].isupper():
+                    # all letter in name upper then constant, e.g. variable, lambda func
+                    return load_func_by_name(val)[0]
+                return load_func_by_name(val)[0](**params)
+            else:
                 return load_func_by_name(val)[0]
-            return load_func_by_name(val)[0](**params)
-        else:
-            return load_func_by_name(val)[0]
+        except:
+            return val  # just normal str, not class or function
     return val
 
 
@@ -302,6 +306,48 @@ def get_file_rec(path):
             files.extend(get_file_rec(cfolder))
 
     return files
+
+
+def get_folder_level(root_path, depth=1):
+    """
+    return all folder, sub-folder with depth
+    :param root_path:
+    :param depth: 1 for current folder only, 2 for all folder in sub-folder of current
+    :return: [Path]
+    """
+    p = Path(root_path)
+    curr_level = [p]
+    all_level = [p]
+    for level in range(depth):
+        next_level = []
+        for xp in curr_level:
+            next_level.extend([o for o in xp.iterdir() if o.is_dir()])
+
+        all_level.extend(next_level)
+        curr_level = next_level
+
+    return all_level
+
+
+def best_match_path(path_list, name):
+    """
+    Find the best match of name in path_list.
+    Wide use when name is an ID and ID are a part of Path name, e.g. CT_$name, $name.npy
+    TODO now simple implement check name is in part (full name)
+    :param path_list:
+    :param name:
+    :return:
+    """
+    candidate = []
+    for o in path_list:
+        if name in str(o):
+            candidate.append(o)
+
+    if len(candidate) == 0:
+        return None
+    if len(candidate) == 1:
+        return candidate[0]
+    return candidate[0]
 
 
 def load_df_img_data(path, index_keys='filename', bb_key='bb'):
@@ -649,7 +695,7 @@ def npy_arr_pretty_print(npy_arr, fm='{:.4f}'):
     :param fm: format string, default is for 4 digits float
     :return:
     """
-    if isinstance(npy_arr, (np.float, np.float64, np.int, np.int64)):
+    if isinstance(npy_arr, (np.float, np.float64, np.int, np.int64, np.int16)):
         return fm.format(npy_arr)
     if isinstance(npy_arr, (int, float)):
         return fm.format(npy_arr)
@@ -779,6 +825,28 @@ def merge_xlsx(files, merged_file=None):
     merged_df.to_excel(merged_file) if merged_file is not None else None
 
     return merged_df
+
+
+class NameSpaceDict(dict):
+    def __init__(self, *arg, **kw):
+        super().__init__(*arg, **kw)
+        self.pkey = 'parent'
+
+    def get(self, k, d=None):
+        ret = super().get(k, d=None)
+        if ret is not None:
+            return ret
+        # get from parent if have
+        if isinstance(super.get(self.pkey), dict):
+            return super.get(self.pkey).get(k, d)
+
+        return d
+
+
+# some normalization function
+normalize_norm = lambda slices, **kw: (slices - slices.mean()) / slices.std()
+normalize_0_1 = lambda slices, **kw: (slices - slices.min()) / (slices.max() - slices.min())
+normalize_n1_1 = lambda slices, **kw: (slices * 2 - slices.max() - slices.min()) / (slices.max() - slices.min())
 
 
 def test_make_check_point_folder():
