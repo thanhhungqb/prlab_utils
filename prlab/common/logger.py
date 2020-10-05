@@ -67,9 +67,11 @@ class PrettyLineHandler(Handler):
 
     def setLevel(self, level, **kwargs):
         self.level = level
+        self.base.setLevel(level)
 
     def addFilter(self, n_filter):
         self.filters.append(n_filter)
+        self.base.addFilter(n_filter)
 
     def emit(self, record: LogRecord) -> None:
         try:
