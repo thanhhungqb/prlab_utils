@@ -27,8 +27,9 @@ from prlab.fastai.utils import general_configure, base_arch_str_to_obj
 from prlab.fastai.video_data import BalancedLabelImageList
 from prlab.gutils import load_func_by_name, set_if, npy_arr_pretty_print, convert_to_obj_or_fn, encode_and_bind, \
     lazy_object_fn_call
-from prlab.torch.functions import fc_exchange_label
 from prlab.popularlib import *
+from prlab.torch.functions import fc_exchange_label
+
 
 def pipeline_control(**kwargs):
     """
@@ -1205,50 +1206,9 @@ def make_one_hot_df_pipe(**config):
     return config
 
 
-class PipeClassWrap:
-    """
-    Convert/Wrap pipe function to class style.
-    Note that class style can be easy to use with object or object_lazy with the custom params
-    Usage:
+from prlab.gutils import PipeClassCallWrap, PipeClassWrap
 
-        def function(**kwargs):
-            print("GeeksforGeeks")
-            print(kwargs)
-
-        obj = PipeClassWrap(fn=function,test='a',o='b')
-        obj(test='override')
-    """
-
-    def __init__(self, fn, **config):
-        self.fn = lazy_object_fn_call(fn, **config)
-        self.config = config
-
-    def __call__(self, *args, **kwargs):
-        # update and override with stored config
-        params = {}
-        params.update(self.config)
-        params.update(kwargs)
-
-        return self.fn(*args, **params)
-
-
-class PipeClassCallWrap:
-    """
-    Wrap a function call with return to a pipe call with update configure
-    """
-
-    def __init__(self, fn, ret_name='out', params=None, map_name=None, **config):
-        self.fn = lazy_object_fn_call(fn, **config)
-        self.fn = self.fn if callable(self.fn) else eval(self.fn)
-        self.ret_name = ret_name
-        self.params = params if params is not None else {}
-        self.map_param_name = {} if map_name is None else map_name
-
-    def __call__(self, *args, **config):
-        new_params = {k: config.get(v) for k, v in self.map_param_name.items()}
-        config[self.ret_name] = self.fn(*args, **{**config, **self.params, **new_params})
-        return config
-
+PipeClassCallWrap, PipeClassWrap  # move to prlab.gutils, just support old call
 
 # define some popular pipe that can be widely use
 default_conf_pipeline = {
