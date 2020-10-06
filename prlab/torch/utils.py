@@ -1,14 +1,61 @@
+import json
 import logging
+import time
 
 import numpy as np
 import torch
 
-from prlab.gutils import convert_to_obj_or_fn
+from prlab.gutils import convert_to_obj_or_fn, to_json_writeable
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler())
 
 count_parameters = lambda model: sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+
+def train_control(**config):
+    train_logger = config.get('train_logger', logger)
+    progress_logger = config.get('progress_logger', train_logger)
+    train_logger.info(json.dumps(to_json_writeable(config), indent=2))
+    train_logger.info("** start training ...")
+    train_logger.info(f"number of trainable parameters {count_parameters(config['model'])}")
+
+    metric_names = [f'n_{i}' for i in range(5)]
+
+    val_best_loss = None
+
+    for epoch in range(int(config["epochs"])):
+        start_time = time.time()
+
+        # one epoch train and validate
+        train_loss, train_score, *_ = one_epoch(**config)
+        val_loss, val_score, *_ = one_epoch(test_mode=True, **config)
+
+        if val_best_loss is None or val_loss < val_best_loss:
+            # TODO best valid callback
+            val_best_loss, val_best_score = val_loss, val_score
+
+        metrics = {
+            'epoch': epoch,
+            'train_loss': train_loss,
+            'val_loss': val_loss,
+            "time": "{:.2f}".format((time.time() - start_time)),
+        }
+        metrics = {**metrics,
+                   **{f'train_{metric_names[i]}': train_score[i] for i in range(len(train_score))},
+                   **{f'val_{metric_names[i]}': val_score[i] for i in range(len(val_score))}}
+
+        progress_logger.info(json.dumps(metrics))
+
+    # log the best valid
+    msg1 = {
+        "Best validation loss": val_best_loss,
+        **{f'best_val_{metric_names[i]}': val_best_score[i] for i in range(len(val_best_score))}
+    }
+    train_logger.info(json.dumps(msg1))
+    progress_logger.info(json.dumps(msg1))
+
+    return config
 
 
 def process_input(i_features, i_targets, device='cuda', **config):
@@ -50,13 +97,13 @@ def process_metrics(preds_lst, targets_lst, **config):
     return metrics_score
 
 
-def one_epoch(data_loader, model, loss_fn, optimizer, test_mode=False, **config):
+def one_epoch(model, loss_func, opt_func, data_loader=None, test_mode=False, **config):
     """
     Run single epoch in both train and test/valid
     :param data_loader:
     :param model:
-    :param loss_fn:
-    :param optimizer:
+    :param loss_func:
+    :param opt_func:
     :param config:
     :param test_mode
     :return:
@@ -67,15 +114,18 @@ def one_epoch(data_loader, model, loss_fn, optimizer, test_mode=False, **config)
     labels_corr = list()
 
     model.train() if not test_mode else model.eval()
+    data_loader = data_loader if data_loader is not None else \
+        (config['data_train'] if not test_mode else config['data_test'])
+
     with torch.no_grad() if test_mode else meaningless_ctx():
         for idx, (i_features, i_targets) in enumerate(data_loader):
-            optimizer.zero_grad() if not test_mode else None
+            opt_func.zero_grad() if not test_mode else None
 
             features, targets = process_input(i_features=i_features, i_targets=i_targets, **config)
             predictions = model(features)
-            loss = loss_fn(predictions, targets)
+            loss = loss_func(predictions, targets)
 
-            (loss.backward(), optimizer.step()) if not test_mode else None
+            (loss.backward(), opt_func.step()) if not test_mode else None
 
             running_loss += loss.item()
             predictions_corr += predictions
