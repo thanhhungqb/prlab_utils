@@ -4,6 +4,8 @@ from pathlib import Path
 from prlab.common.logger import PrettyLineHandler, WandbHandler
 from prlab.gutils import make_check_point_folder, convert_to_obj_or_fn
 
+logger = logging.getLogger(__name__)
+
 
 # ========================  GENERAL ========================
 def general_dl_make_up(**config):
