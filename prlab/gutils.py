@@ -876,17 +876,24 @@ class PipeClassCallWrap:
     Wrap a function call with return to a pipe call with update configure
     """
 
-    def __init__(self, fn, ret_name='out', params=None, map_name=None, **config):
+    def __init__(self, fn, ret_name='out', params=None, map_name=None, fixed_params=None, **config):
         self.fn = lazy_object_fn_call(fn, **config)
         self.fn = self.fn if callable(self.fn) else eval(self.fn)
         self.ret_name = ret_name
         self.params = params if params is not None else {}
         self.map_param_name = {} if map_name is None else map_name
+        self.fixed_params = fixed_params  # support for class/func that has fixed number params (does not allow **kw)
 
     def __call__(self, *args, **config):
         new_params = {k: config.get(v) for k, v in self.map_param_name.items()}
-        config[self.ret_name] = self.fn(*args, **{**config, **self.params, **new_params})
+        to_pass = {**config, **self.params, **new_params}
+        if self.fixed_params is not None:
+            to_pass = {k: v for k, v in to_pass.items() if k in self.fixed_params}
+        config[self.ret_name] = self.fn(*args, **to_pass)
         return config
+
+    def __repr__(self):
+        return f"PipeClassCallWrap ( {str(self.fn)} )"
 
 
 # ============================ END OF PIPE =================================
