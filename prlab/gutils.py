@@ -2,6 +2,7 @@ import copy
 import datetime
 import importlib
 import json
+import logging
 import random
 import time
 from pathlib import Path
@@ -894,6 +895,32 @@ class PipeClassCallWrap:
 
     def __repr__(self):
         return f"PipeClassCallWrap ( {str(self.fn)} )"
+
+
+def get_pipes(base_name, n_max=1000, **config):
+    """
+    get all pipes and flatten to one list. Pipe in form {base_name}-{i} with i<n_max
+    :param base_name: e.g. preprocessing-pipeline
+    :param n_max:
+    :param config:
+    :return:
+    """
+    p_names = [f'{base_name}-{i}' for i in range(n_max) if f'{base_name}-{i}' in config.keys()]
+
+    logger = logging.getLogger(__name__)
+
+    pipes = []
+    for p_n in p_names:
+        pipes.append(
+            PipeClassCallWrap(fn=lambda msg, **kw: logger.info(msg),
+                              params={'msg': f"run pipeline {p_n}"}))
+        pipes.extend(config[p_n])
+
+    # support old version without {i} part
+    if len(pipes) == 0 and base_name in config.keys():
+        pipes = [base_name]
+
+    return pipes
 
 
 # ============================ END OF PIPE =================================
