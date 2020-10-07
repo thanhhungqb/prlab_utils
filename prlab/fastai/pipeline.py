@@ -92,6 +92,7 @@ def pipeline_control_multi(**kwargs):
         # then convert_to_obj_or_fn should be call after previous step done.
         process_pipeline = convert_to_obj_or_fn(config[pipe_name])
         for fn in process_pipeline:
+            fn = convert_to_obj_or_fn(fn, lazy=True)
             config = fn(**config)
 
     return config
