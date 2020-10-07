@@ -18,6 +18,7 @@ from outside.utils import find_modules
 
 Path.ls = lambda x: list(x.iterdir())
 prlab_modules = ['prlab.{}'.format(o) for o in find_modules(['prlab'])]
+logger = logging.getLogger(__name__)
 
 
 def clean_str(s): return '_'.join(s.split()).replace('/', '')
