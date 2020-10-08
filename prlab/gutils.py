@@ -11,7 +11,7 @@ import click
 import numpy as np
 import pandas as pd
 import sklearn
-from sklearn import preprocessing
+from sklearn import preprocessing, model_selection
 
 # add ls function to Path for easy to use
 from outside.utils import find_modules
@@ -827,6 +827,55 @@ def merge_xlsx(files, merged_file=None):
     merged_df.to_excel(merged_file) if merged_file is not None else None
 
     return merged_df
+
+
+def train_test_split_fold(**config):
+    """
+    Split train/test/valid? by fold mode
+    Given:
+        df [fold?] (make fold column if not given, using k=5), should save to file for later access
+        test_fold/fold/1
+    :param config:
+    :return: config with update train_df and test_df (valid_df)
+    """
+    df = config['df']
+    test_fold = config.get('test_fold', config.get('fold', 1))
+
+    # check 'fold' in head, if not then make
+    if 'fold' not in df.columns:
+        k = config.get('k', 5)
+        folds = [random.randint(0, k - 1) for _ in range(len(df))]
+        df['fold'] = folds
+
+    train_df = df[df['fold'] != test_fold]
+    test_df = df[df['fold'] == test_fold]
+    if config.get('valid_flag', None) is not None:
+        # TODO valid mode maybe: rand_fold, fold, rand_rate
+        # get list of candi
+        valid_flag = config['valid_flag']
+        if isinstance(valid_flag, (int, bool, str)):
+            valid_fold = valid_flag if isinstance(valid_flag, int) else \
+                random.choice(list(set(train_df['fold'])))
+
+            valid_df = train_df[train_df['fold'] == valid_fold]
+            train_df = train_df[train_df['fold'] != valid_fold]
+
+        elif isinstance(valid_flag, float):
+            idxs = list(train_df.index)
+            train_idx, valid_idx = model_selection.train_test_split(idxs, test_size=valid_flag)
+            valid_df = train_df.loc[valid_idx]
+            train_df = train_df.loc[train_idx]
+        else:
+            raise Exception("valid_flag should be int, bool, str or float")
+
+        config['valid_df'] = valid_df.reset_index(drop=True)
+
+    config.update({
+        'train_df': train_df.reset_index(drop=True),
+        'test_df': test_df.reset_index(drop=True)
+    })
+
+    return config
 
 
 class NameSpaceDict(dict):
