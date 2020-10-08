@@ -850,8 +850,7 @@ def train_test_split_fold(**config):
     train_df = df[df['fold'] != test_fold]
     test_df = df[df['fold'] == test_fold]
     if config.get('valid_flag', None) is not None:
-        # TODO valid mode maybe: rand_fold, fold, rand_rate
-        # get list of candi
+        # valid mode maybe: rand_fold, fold, rand_rate
         valid_flag = config['valid_flag']
         if isinstance(valid_flag, (int, bool, str)):
             valid_fold = valid_flag if isinstance(valid_flag, int) else \
