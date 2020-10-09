@@ -331,6 +331,7 @@ def fc_exchange_label(fc, new_pos=None, in_place=False):
         new_fc.weight.data.copy_(w), new_fc.bias.data.copy_(b)
         return new_fc
 
+
 # # We want to crop a 80x80 image randomly for our batch
 # # Building central crop of 80 pixel size
 # grid_source = build_grid(batch.size(2), 80)
@@ -338,3 +339,25 @@ def fc_exchange_label(fc, new_pos=None, in_place=False):
 # grid_shifted = random_crop_grid(batch, grid_source)
 # # Sample using grid sample
 # sampled_batch = F.grid_sample(batch, grid_shifted)
+
+class TransformsWrapFn:
+    # transform wrap from fn(img_tensor, ...) -> img_tensor
+    # Usage:
+    #       TransformsWrapFn(crop_3d_volume, fixed_params=['crop_dim', 'crop_size'], crop_dim=256, crop_size=256)
+    #       TransformsWrapFn(random_zoom, fixed_params=['min_percentage', 'max_percentage'],
+    #           min_percentage=0.7, max_percentage=1.2)
+    def __init__(self, fn, fixed_params=None, **params):
+        """
+        :param fn: callable
+        :param fixed_params: list of param names
+        :param params: param to pass to fn
+        """
+        self.fn = fn
+        self.params = params
+        self.fixed_params = fixed_params
+
+    def __call__(self, *args, **kwargs):
+        params = {**kwargs, **self.params}
+        if self.fixed_params is not None:
+            params = {k: params[k] for k in self.fixed_params}
+        return self.fn(*args, **params)
