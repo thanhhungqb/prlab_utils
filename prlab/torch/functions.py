@@ -1,3 +1,5 @@
+from typing import Optional
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -15,6 +17,20 @@ class PassThrough(nn.Module):
 
     def forward(self, *input, **kwargs):
         return input[0]
+
+
+class AdaptiveConcatPool3d(nn.Module):
+    """Layer that concats `AdaptiveAvgPool3d` and `AdaptiveMaxPool3d`.
+    credit: https://www.kaggle.com/guntherthepenguin/fastai-v1-group-equivariate-cnns
+    """
+
+    def __init__(self, sz: Optional[int] = None):
+        "Output will be 2*sz or 2 if sz is None"
+        super().__init__()
+        sz = sz or 1
+        self.ap, self.mp = nn.AdaptiveAvgPool3d(sz), nn.AdaptiveMaxPool3d(sz)
+
+    def forward(self, x): return torch.cat([self.mp(x), self.ap(x)], 1)
 
 
 class ExLoss(nn.Module):
