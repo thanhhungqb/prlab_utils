@@ -22,8 +22,6 @@ def rand_crop_near_center(img_tensor, crop_size, d, **kwargs):
 
     r_d = (np.random.rand(len(d)) * d).astype(int)
     ss = (org_dim - dim) // 2 - r_d
-    print('ss', ss)
-    print(ss[0], ss[0] + dim[0])
 
     if len(img_tensor.shape) == 2:
         return img_tensor[ss[0]:ss[0] + dim[0], ss[1]:ss[1] + dim[1]]
