@@ -66,6 +66,10 @@ def convert_to_obj_or_fn(val, lazy=False, **params):
         # simply keep as it to use later
         if len(val) > 1 and val[0] == "object_lazy":
             return convert_to_obj_or_fn(tuple(val[1:]), **params) if lazy else val
+        if len(val) > 1 and val[0] == "object_lambda":
+            # make a lambda function from ["object_lambda", "lambda ..."]
+            return eval(val[1])
+
         return [convert_to_obj_or_fn(o, **params) for o in val]
 
     if isinstance(val, tuple):
