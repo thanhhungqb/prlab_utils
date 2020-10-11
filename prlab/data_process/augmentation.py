@@ -21,7 +21,8 @@ def rand_crop_near_center(img_tensor, crop_size, d, **kwargs):
     if len(img_tensor.shape) == 3 and org_dim[0] < dim[0] + 2 * d[0]:
         # padding for number of slices if less than require
         n_pad = dim[0] + 2 * d[0] - org_dim[0]
-        img_tensor = np.pad(img_tensor, ((n_pad // 2, n_pad - n_pad // 2), (0, 0), (0, 0)), 'edge')
+        img_tensor = np.pad(img_tensor, ((n_pad // 2, n_pad - n_pad // 2), (0, 0), (0, 0)),
+                            'constant', constant_values=kwargs.get('pad_constant_values', 0))
         org_dim = np.array(img_tensor.shape, dtype=int)
 
     assert np.all(org_dim - dim - 2 * d >= 0)
