@@ -45,7 +45,7 @@ def make_train_loggers(**config):
     logger_progress.addHandler(PrettyLineHandler())
     logger_progress.addHandler(PrettyLineHandler(base_hdl=logging.FileHandler(config["cp"] / "progress.log")))
     if config.get('wandb') is not None:
-        logger_progress.addHandler(WandbHandler(proj_name=proj_name))
+        logger_progress.addHandler(WandbHandler(**config))
 
     return {**config, 'train_logger': logger_general, 'progress_logger': logger_progress}
 # ========================  END OF GENERAL ========================
