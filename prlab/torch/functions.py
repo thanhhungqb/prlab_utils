@@ -185,6 +185,10 @@ class WeightsAcc:
         return self.base_acc(c_out, target)
 
 
+def mae(pred, target, **kwargs):
+    return torch.abs(target - pred).mean()
+
+
 def make_theta_from_st(st, is_inverse=False):
     """
     ST without rotate
