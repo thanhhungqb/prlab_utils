@@ -23,7 +23,8 @@ class WandbHandler(Handler):
         self.lock = None
 
         name = config.get('proj_name', 'default')
-        wandb.init(config=config, project=name)
+        wandb.init(name=config.get('run'), project=name,
+                   dir=config.get('cp', './wandb'))
 
     def set_model(self, model):
         self.wandb.watch(model)
@@ -50,6 +51,7 @@ class PrettyLineHandler(Handler):
         or
         logger.addHandler(PrettyLineHandler(logging.FileHandler('/ws/tmp/t.txt', mode='w')))
     """
+
     def __init__(self, base_hdl=None, pretty_fn=None, **config):
         super(PrettyLineHandler, self).__init__(**config)
 
