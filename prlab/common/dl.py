@@ -2,7 +2,7 @@ import logging
 from pathlib import Path
 
 from prlab.common.logger import PrettyLineHandler, WandbHandler
-from prlab.gutils import make_check_point_folder, convert_to_obj_or_fn
+from prlab.common.utils import make_check_point_folder, convert_to_obj_or_fn
 
 logger = logging.getLogger(__name__)
 
