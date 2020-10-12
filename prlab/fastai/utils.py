@@ -21,7 +21,7 @@ from torch.nn.functional import log_softmax
 
 from outside.scikit.plot_confusion_matrix import plot_confusion_matrix
 from prlab.common.dl import general_dl_make_up
-from prlab.gutils import convert_to_obj_or_fn, load_func_by_name, \
+from prlab.common.utils import convert_to_obj_or_fn, load_func_by_name, \
     lazy_object_fn_call
 from prlab.torch.functions import ExLoss, weights_branches
 
