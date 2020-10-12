@@ -14,10 +14,7 @@ import sklearn
 from sklearn import preprocessing, model_selection
 
 # add ls function to Path for easy to use
-from outside.utils import find_modules
-
 Path.ls = lambda x: list(x.iterdir())
-prlab_modules = ['prlab.{}'.format(o) for o in find_modules(['prlab'])]
 logger = logging.getLogger(__name__)
 
 
@@ -724,6 +721,8 @@ def fix_name_func_class(**config):
     :param config:
     :return:
     """
+    from outside.utils import find_modules
+    prlab_modules = ['prlab.{}'.format(o) for o in find_modules(['prlab'])]
 
     for k in config.keys():
         val = config[k]
