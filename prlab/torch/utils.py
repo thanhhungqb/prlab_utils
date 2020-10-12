@@ -144,9 +144,9 @@ def one_epoch(model, loss_func, opt_func, data_loader=None, test_mode=False, **c
 
             features, targets = process_input(i_features=i_features, i_targets=i_targets, **config)
             predictions = model(features)
-            predictions = torch.squeeze(predictions, -1)  # TODO fix later, why shape in case [bs, 1] instead [bs], reg
+            predictions = torch.squeeze(predictions, -1)
 
-            loss = loss_func(predictions, targets.float())  # TODO fix later, should check if need convert, int or float
+            loss = loss_func(predictions, targets)
 
             (loss.backward(), opt_func.step()) if not test_mode else None
 
