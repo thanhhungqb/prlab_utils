@@ -59,6 +59,30 @@ def train_control(**config):
     return config
 
 
+def eval_control(**config):
+    train_logger = config.get('train_logger', logger)
+    progress_logger = config.get('progress_logger', train_logger)
+    train_logger.info("** start testing ...")
+
+    metric_names = [f'n_{i}' for i in range(5)]
+
+    start_time = time.time()
+
+    # eval in test set here
+    to_test_config = {**config, 'data_valid': config['data_test']}
+    test_loss, val_score, *_ = one_epoch(test_mode=True, **to_test_config)
+
+    metrics = {'test_loss': test_loss,
+               "time": "{:.2f}".format((time.time() - start_time)),
+               **{f'test_{metric_names[i]}': val_score[i] for i in range(len(val_score))}}
+
+    msg1 = to_json_writeable(metrics)
+    progress_logger.info(json.dumps(msg1))
+    train_logger.info(json.dumps(msg1))
+
+    return config
+
+
 def process_input(i_features, i_targets, device='cuda', **config):
     """
     Process and convert to device (cpu, gpu).
@@ -111,7 +135,7 @@ def one_epoch(model, loss_func, opt_func, data_loader=None, test_mode=False, **c
 
     model.train() if not test_mode else model.eval()
     data_loader = data_loader if data_loader is not None else \
-        (config['data_train'] if not test_mode else config['data_test'])
+        (config['data_train'] if not test_mode else config.get('data_valid', config['data_test']))
 
     n_count = 0
     with torch.no_grad() if test_mode else meaningless_ctx():
