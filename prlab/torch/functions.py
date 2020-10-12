@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from prlab.gutils import load_func_by_name
+from prlab.common.utils import load_func_by_name
 
 
 class PassThrough(nn.Module):
