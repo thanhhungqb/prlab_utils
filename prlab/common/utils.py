@@ -96,7 +96,7 @@ def convert_to_obj_or_fn(val, lazy=False, **params):
 
 def check_convert_to_obj_or_fn(val, level=0, **params):
     """
-    Similar to `prlab.gutils.convert_to_obj_or_fn` but just check to make sure module and class/function available.
+    Similar to `prlab.common.utils.convert_to_obj_or_fn` but just check to make sure module and class/function available.
     'object', 'object_lazy' is reversed words
     :param val: current data to convert
     :param params: similar global variable e.g. whole dict

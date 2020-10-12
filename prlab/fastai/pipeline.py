@@ -25,7 +25,7 @@ from outside.super_resolution.srnet import SRNet3
 from prlab.fastai.image_data import SamplerImageList
 from prlab.fastai.utils import general_configure, base_arch_str_to_obj
 from prlab.fastai.video_data import BalancedLabelImageList
-from prlab.gutils import load_func_by_name, set_if, npy_arr_pretty_print, convert_to_obj_or_fn, encode_and_bind, \
+from prlab.common.utils import load_func_by_name, set_if, npy_arr_pretty_print, convert_to_obj_or_fn, encode_and_bind, \
     lazy_object_fn_call
 from prlab.popularlib import *
 from prlab.torch.functions import fc_exchange_label
@@ -1207,9 +1207,9 @@ def make_one_hot_df_pipe(**config):
     return config
 
 
-from prlab.gutils import PipeClassCallWrap, PipeClassWrap
+from prlab.common.utils import PipeClassCallWrap, PipeClassWrap
 
-PipeClassCallWrap, PipeClassWrap  # move to prlab.gutils, just support old call
+PipeClassCallWrap, PipeClassWrap  # move to prlab.common.utils, just support old call
 
 # define some popular pipe that can be widely use
 default_conf_pipeline = {

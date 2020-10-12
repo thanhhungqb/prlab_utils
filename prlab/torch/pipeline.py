@@ -7,7 +7,7 @@ Class Pipe also supported:
 """
 import logging
 
-from prlab.gutils import convert_to_obj_or_fn
+from prlab.common.utils import convert_to_obj_or_fn
 
 logger = logging.getLogger(__name__)
 
