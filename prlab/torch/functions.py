@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from prlab.common.utils import load_func_by_name
+from prlab.common.utils import load_func_by_name, convert_to_obj_or_fn
 
 
 class PassThrough(nn.Module):
@@ -372,7 +372,7 @@ class TransformsWrapFn:
         :param fixed_params: list of param names
         :param params: param to pass to fn
         """
-        self.fn = fn
+        self.fn = convert_to_obj_or_fn(fn)
         self.params = params
         self.fixed_params = fixed_params
 
