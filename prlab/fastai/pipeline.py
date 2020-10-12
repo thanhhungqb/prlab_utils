@@ -22,13 +22,15 @@ from sklearn.metrics import confusion_matrix
 from outside.scikit.plot_confusion_matrix import plot_confusion_matrix
 from outside.stn import STN
 from outside.super_resolution.srnet import SRNet3
-from prlab.common.utils import load_func_by_name, set_if, npy_arr_pretty_print, convert_to_obj_or_fn, encode_and_bind, \
-    lazy_object_fn_call
+from prlab.common import *
+from prlab.common.dl import pipeline_control_multi
+from prlab.common.utils import load_func_by_name, set_if, npy_arr_pretty_print, encode_and_bind, lazy_object_fn_call
 from prlab.fastai.image_data import SamplerImageList
 from prlab.fastai.utils import general_configure, base_arch_str_to_obj
 from prlab.fastai.video_data import BalancedLabelImageList
-from prlab.common import *
 from prlab.torch.functions import fc_exchange_label
+
+pipeline_control_multi  # just for old reference, new call should be in prlab.common.dl.pipeline_control_multi
 
 
 def pipeline_control(**kwargs):
@@ -51,49 +53,6 @@ def pipeline_control(**kwargs):
     process_pipeline = [load_func_by_name(o)[0] if isinstance(o, str) else o for o in config['process_pipeline']]
     for fn in process_pipeline:
         config = fn(**config)
-
-    return config
-
-
-def pipeline_control_multi(**kwargs):
-    """
-    For general control overall pipeline, support for multi pipeline
-    See `prlab.fastai.pipeline.pipeline_control`
-    What different:
-        - `prlab.fastai.utils.general_configure` add to pipe instead call directly
-        - support many pipeline in order name (max1000): process_pipeline_0, process_pipeline_1, ...
-        Why process_pipeline in the middle? FOR SUPPORT THE OLDER VERSION of configure file
-    :param kwargs: configure
-    :return:
-    """
-    config = {}
-    config.update(**kwargs)
-
-    ordered_pipeline_names = ['process_pipeline_{}'.format(i) for i in range(1000) if
-                              config.get('process_pipeline_{}'.format(i), None) is not None]
-    # sometime set 'none' instead list to disable it (override json by command line)
-    ordered_pipeline_names = [o for o in ordered_pipeline_names if isinstance(config[o], list)]
-    if len(ordered_pipeline_names) == 0:
-        # support old version of configure file
-        ordered_pipeline_names = ['process_pipeline']
-
-    # TODO
-    #   Do we need object create and call here, if then lazy should be consider for all pipe
-    #   then local and global params should be careful consider
-    #   for lazy load, another problem with module load at runtime also have to care because
-    #   some case, source code are remove immediately after main process run
-    # this step to make sure all name could be convert to function to call later
-    # this is early check
-    for pipe_name in ordered_pipeline_names:
-        convert_to_obj_or_fn(config[pipe_name])
-
-    for pipe_name in ordered_pipeline_names:
-        # the previous output config may be affect the next step of the pipeline,
-        # then convert_to_obj_or_fn should be call after previous step done.
-        process_pipeline = convert_to_obj_or_fn(config[pipe_name])
-        for fn in process_pipeline:
-            fn = convert_to_obj_or_fn(fn, lazy=True)
-            config = fn(**config)
 
     return config
 

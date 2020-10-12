@@ -7,6 +7,54 @@ from prlab.common.utils import make_check_point_folder, convert_to_obj_or_fn
 logger = logging.getLogger(__name__)
 
 
+# ======================== CONTROL =========================
+def pipeline_control_multi(**kwargs):
+    """
+    For general control overall pipeline, support for multi pipeline
+    See `prlab.fastai.pipeline.pipeline_control`
+    What different:
+        - `prlab.fastai.utils.general_configure` add to pipe instead call directly
+        - support many pipeline in order name (max1000): process_pipeline_0, process_pipeline_1, ...
+        Why process_pipeline in the middle? FOR SUPPORT THE OLDER VERSION of configure file
+    :param kwargs: configure
+    :return:
+    """
+    config = {}
+    config.update(**kwargs)
+
+    ordered_pipeline_names = ['process_pipeline_{}'.format(i) for i in range(1000) if
+                              config.get('process_pipeline_{}'.format(i), None) is not None]
+    # sometime set 'none' instead list to disable it (override json by command line)
+    ordered_pipeline_names = [o for o in ordered_pipeline_names if isinstance(config[o], list)]
+    if len(ordered_pipeline_names) == 0:
+        # support old version of configure file
+        ordered_pipeline_names = ['process_pipeline']
+
+    # TODO
+    #   Do we need object create and call here, if then lazy should be consider for all pipe
+    #   then local and global params should be careful consider
+    #   for lazy load, another problem with module load at runtime also have to care because
+    #   some case, source code are remove immediately after main process run
+    # this step to make sure all name could be convert to function to call later
+    # this is early check
+    for pipe_name in ordered_pipeline_names:
+        convert_to_obj_or_fn(config[pipe_name])
+
+    for pipe_name in ordered_pipeline_names:
+        # the previous output config may be affect the next step of the pipeline,
+        # then convert_to_obj_or_fn should be call after previous step done.
+        process_pipeline = convert_to_obj_or_fn(config[pipe_name])
+        for fn in process_pipeline:
+            fn = convert_to_obj_or_fn(fn, lazy=True)
+            if callable(fn):
+                config = fn(**config)
+            else:
+                logger = config.get('train_logger', logging.getLogger(__name__))
+                logger.warning(f"{fn} is not callable")
+
+    return config
+
+
 # ========================  GENERAL ========================
 def general_dl_make_up(**config):
     """
