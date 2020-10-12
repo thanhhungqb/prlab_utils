@@ -27,7 +27,7 @@ from prlab.common.utils import load_func_by_name, set_if, npy_arr_pretty_print, 
 from prlab.fastai.image_data import SamplerImageList
 from prlab.fastai.utils import general_configure, base_arch_str_to_obj
 from prlab.fastai.video_data import BalancedLabelImageList
-from prlab.popularlib import *
+from prlab.common import *
 from prlab.torch.functions import fc_exchange_label
 
 
