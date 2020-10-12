@@ -5,7 +5,7 @@ import time
 import numpy as np
 import torch
 
-from prlab.gutils import convert_to_obj_or_fn, to_json_writeable
+from prlab.common.utils import convert_to_obj_or_fn, to_json_writeable
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler())
@@ -45,13 +45,14 @@ def train_control(**config):
                    **{f'train_{metric_names[i]}': train_score[i] for i in range(len(train_score))},
                    **{f'val_{metric_names[i]}': val_score[i] for i in range(len(val_score))}}
 
-        progress_logger.info(json.dumps(metrics))
+        progress_logger.info(json.dumps(to_json_writeable(metrics)))
 
     # log the best valid
     msg1 = {
         "Best validation loss": val_best_loss,
         **{f'best_val_{metric_names[i]}': val_best_score[i] for i in range(len(val_best_score))}
     }
+    msg1 = to_json_writeable(msg1)
     train_logger.info(json.dumps(msg1))
     progress_logger.info(json.dumps(msg1))
 
@@ -76,23 +77,18 @@ def process_input(i_features, i_targets, device='cuda', **config):
     return features, targets
 
 
-def process_metrics(preds_lst, targets_lst, **config):
+def process_metrics(preds_tensor, targets_tensor, **config):
     """
     TODO some case, when output is not single tensor, then this command will get error
     TODO work with tensor instead numpy as it directly output of model (maybe in gpu also)
     each element in list is a batch output, not single, then flatten is need before cal
-    :param preds_lst: each element is preds for one BATCH
-    :param targets_lst: each element is target for one BATCH
+    :param preds_tensor: each element is preds for one BATCH
+    :param targets_tensor: each element is target for one BATCH
     :param config:
     :return:
     """
-
     metrics = [convert_to_obj_or_fn(o, **config) for o in config.get('metrics', [])]
-
-    # TODO flatten BATCH mode
-
-    targets, preds = np.array(targets_lst), np.array(preds_lst)
-    metrics_score = np.array([metric(preds, targets) for metric in metrics])
+    metrics_score = np.array([metric(preds_tensor, targets_tensor) for metric in metrics])
 
     return metrics_score
 
@@ -117,22 +113,28 @@ def one_epoch(model, loss_func, opt_func, data_loader=None, test_mode=False, **c
     data_loader = data_loader if data_loader is not None else \
         (config['data_train'] if not test_mode else config['data_test'])
 
+    n_count = 0
     with torch.no_grad() if test_mode else meaningless_ctx():
         for idx, (i_features, i_targets) in enumerate(data_loader):
             opt_func.zero_grad() if not test_mode else None
 
             features, targets = process_input(i_features=i_features, i_targets=i_targets, **config)
             predictions = model(features)
-            loss = loss_func(predictions, targets)
+            predictions = torch.squeeze(predictions, -1)  # TODO fix later, why shape in case [bs, 1] instead [bs], reg
+
+            loss = loss_func(predictions, targets.float())  # TODO fix later, should check if need convert, int or float
 
             (loss.backward(), opt_func.step()) if not test_mode else None
 
             running_loss += loss.item()
+            n_count += 1
             predictions_corr += predictions
             labels_corr += targets
 
-    metric_scores = process_metrics(preds_lst=predictions_corr, targets_lst=labels_corr, **config)
-    return running_loss / len(labels_corr), metric_scores
+    loss_val = running_loss / n_count
+    predictions_corr, labels_corr = torch.tensor(predictions_corr), torch.tensor(labels_corr)
+    metric_scores = process_metrics(preds_tensor=predictions_corr, targets_tensor=labels_corr, **config)
+    return loss_val, metric_scores
 
 
 class meaningless_ctx:
