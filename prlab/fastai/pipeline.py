@@ -22,11 +22,11 @@ from sklearn.metrics import confusion_matrix
 from outside.scikit.plot_confusion_matrix import plot_confusion_matrix
 from outside.stn import STN
 from outside.super_resolution.srnet import SRNet3
+from prlab.common.utils import load_func_by_name, set_if, npy_arr_pretty_print, convert_to_obj_or_fn, encode_and_bind, \
+    lazy_object_fn_call
 from prlab.fastai.image_data import SamplerImageList
 from prlab.fastai.utils import general_configure, base_arch_str_to_obj
 from prlab.fastai.video_data import BalancedLabelImageList
-from prlab.common.utils import load_func_by_name, set_if, npy_arr_pretty_print, convert_to_obj_or_fn, encode_and_bind, \
-    lazy_object_fn_call
 from prlab.popularlib import *
 from prlab.torch.functions import fc_exchange_label
 
