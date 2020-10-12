@@ -1,3 +1,5 @@
+import math
+
 import numpy as np
 from scipy.ndimage import rotate
 
@@ -55,3 +57,26 @@ def random_rotate_xy(img_numpy, angle=(-30, 30), **kwargs):
     angle = np.random.randint(low=min_angle, high=max_angle + 1)
     axes = (1, 2) if img_numpy.ndim == 3 else (0, 1)  # img in form: [n_slices, y, x]
     return rotate(img_numpy, angle, axes=axes)
+
+
+def downsample_z_3d(img_npy, n_sample, **kwargs):
+    """
+    Sampling belong to z of [z, y, x] in 3D form, get nearest slice
+    :param img_npy: [z, y, x]
+    :param n_sample:
+    :param kwargs:
+    :return: [n_sample, y, x]
+    """
+    assert img_npy.ndim == 3
+    if img_npy.shape[0] < n_sample:
+        # padding for number of slices if less than require
+        n_pad = n_sample - img_npy.shape[0]
+        img_npy = np.pad(img_npy, ((n_pad // 2, n_pad - n_pad // 2), (0, 0), (0, 0)),
+                         'constant', constant_values=kwargs.get('pad_constant_values', 0))
+        return img_npy
+
+    if img_npy.shape[0] == n_sample: return img_npy
+
+    selected_idx = [(img_npy.shape[0] - 1) / n_sample * i for i in range(n_sample)]
+    selected_idx = [math.ceil(o) for o in selected_idx]
+    return img_npy[selected_idx, :, :]
