@@ -37,20 +37,20 @@ def train_control(**config):
 
         metrics = {
             'epoch': epoch,
-            'train_loss': train_loss,
-            'val_loss': val_loss,
+            'train_loss': float(train_loss),
+            'val_loss': float(val_loss),
             "time": "{:.2f}".format((time.time() - start_time)),
         }
         metrics = {**metrics,
-                   **{f'train_{metric_names[i]}': train_score[i] for i in range(len(train_score))},
-                   **{f'val_{metric_names[i]}': val_score[i] for i in range(len(val_score))}}
+                   **{f'train_{metric_names[i]}': float(train_score[i]) for i in range(len(train_score))},
+                   **{f'val_{metric_names[i]}': float(val_score[i]) for i in range(len(val_score))}}
 
         progress_logger.info(json.dumps(to_json_writeable(metrics)))
 
     # log the best valid
     msg1 = {
-        "Best validation loss": val_best_loss,
-        **{f'best_val_{metric_names[i]}': val_best_score[i] for i in range(len(val_best_score))}
+        "Best validation loss": float(val_best_loss),
+        **{f'best_val_{metric_names[i]}': float(val_best_score[i]) for i in range(len(val_best_score))}
     }
     msg1 = to_json_writeable(msg1)
     train_logger.info(json.dumps(msg1))
@@ -72,9 +72,9 @@ def eval_control(**config):
     to_test_config = {**config, 'data_valid': config['data_test']}
     test_loss, val_score, *_ = one_epoch(test_mode=True, **to_test_config)
 
-    metrics = {'test_loss': test_loss,
+    metrics = {'test_loss': float(test_loss),
                "time": "{:.2f}".format((time.time() - start_time)),
-               **{f'test_{metric_names[i]}': val_score[i] for i in range(len(val_score))}}
+               **{f'test_{metric_names[i]}': float(val_score[i]) for i in range(len(val_score))}}
 
     msg1 = to_json_writeable(metrics)
     progress_logger.info(json.dumps(msg1))
