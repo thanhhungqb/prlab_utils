@@ -539,6 +539,22 @@ def command_run(ctx, run_id, json_conf):
     """
     print('run ID', run_id)
 
+    config = load_json_conf(ctx=ctx, json_conf=json_conf)
+    # load function by str
+    fn, mod_ = load_func_by_name(config['call'])
+    out = fn(**config)
+
+    print(out)
+
+
+def load_json_conf(ctx, json_conf, **kwargs):
+    """
+    To work with command_run and run_k_fold
+    :param ctx: from click context
+    :param json_conf:
+    :param kwargs:
+    :return:
+    """
     config = {}
     if json_conf:
         with open(json_conf) as fp:
@@ -558,12 +574,7 @@ def command_run(ctx, run_id, json_conf):
 
     #  one more time to override configure from command line
     config.update(**extra_args)
-
-    # load function by str
-    fn, mod_ = load_func_by_name(config['call'])
-    out = fn(**config)
-
-    print(out)
+    return config
 
 
 @click.command(name='run_k_fold', context_settings=dict(
@@ -584,24 +595,7 @@ def run_k_fold(ctx, run_id, json_conf):
     """
     print('run ID', run_id)
 
-    config = {}
-    if json_conf:
-        with open(json_conf) as fp:
-            config = json.load(fp=fp)
-
-    extra_args = parse_extra_args_click(ctx)
-    config.update(**extra_args)
-
-    # all other configure json_conf2, ... will be in config too
-    for idx in range(20):
-        additional_conf = 'json_conf{}'.format(idx)
-        if config.get(additional_conf, None) is not None:
-            with open(config[additional_conf]) as fp:
-                config2 = json.load(fp=fp)
-                config.update(**config2)
-
-    #  one more time to override configure from command line
-    config.update(**extra_args)
+    config = load_json_conf(ctx=ctx, json_conf=json_conf)
 
     config['run_id'] = run_id
     set_if(config, 'k', 5)
