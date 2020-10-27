@@ -547,29 +547,46 @@ def command_run(ctx, run_id, json_conf):
     print(out)
 
 
-def load_json_conf(ctx, json_conf, **kwargs):
+def load_json_conf(ctx, json_conf, max_conf_file=20, **kwargs):
     """
     To work with command_run and run_k_fold
     :param ctx: from click context
     :param json_conf:
+    :param max_conf_file: maximum number of configure file
     :param kwargs:
     :return:
     """
+
+    def load_depend_conf(**conf):
+        while conf.get('depend_on') is not None:
+            dependent = conf['depend_on']
+            del conf['depend_on']
+            if isinstance(dependent, dict):
+                conf = {**dependent, **conf}
+                # conf.update(dependent)
+            else:
+                with open(dependent) as f_depend:
+                    conf = {**json.load(fp=f_depend), **conf}
+                    # conf.update(json.load(fp=f_depend))
+        return conf
+
     config = {}
     if json_conf:
         with open(json_conf) as fp:
             config = json.load(fp=fp)
+            config = load_depend_conf(**config)
         config['json_conf'] = json_conf
 
     extra_args = parse_extra_args_click(ctx)
     config.update(**extra_args)
 
     # all other configure json_conf2, ... will be in config too
-    for idx in range(20):
+    for idx in range(max_conf_file):
         additional_conf = 'json_conf{}'.format(idx)
         if config.get(additional_conf, None) is not None:
             with open(config[additional_conf]) as fp:
                 config2 = json.load(fp=fp)
+                config2 = load_depend_conf(**config2)
                 config.update(**config2)
 
     #  one more time to override configure from command line
