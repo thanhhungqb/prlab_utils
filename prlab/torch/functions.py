@@ -1,8 +1,10 @@
+from typing import Optional
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from prlab.gutils import load_func_by_name
+from prlab.common.utils import load_func_by_name, convert_to_obj_or_fn
 
 
 class PassThrough(nn.Module):
@@ -15,6 +17,20 @@ class PassThrough(nn.Module):
 
     def forward(self, *input, **kwargs):
         return input[0]
+
+
+class AdaptiveConcatPool3d(nn.Module):
+    """Layer that concats `AdaptiveAvgPool3d` and `AdaptiveMaxPool3d`.
+    credit: https://www.kaggle.com/guntherthepenguin/fastai-v1-group-equivariate-cnns
+    """
+
+    def __init__(self, sz: Optional[int] = None):
+        "Output will be 2*sz or 2 if sz is None"
+        super().__init__()
+        sz = sz or 1
+        self.ap, self.mp = nn.AdaptiveAvgPool3d(sz), nn.AdaptiveMaxPool3d(sz)
+
+    def forward(self, x): return torch.cat([self.mp(x), self.ap(x)], 1)
 
 
 class ExLoss(nn.Module):
@@ -167,6 +183,10 @@ class WeightsAcc:
         c_out = weights_branches(pred=pred)
 
         return self.base_acc(c_out, target)
+
+
+def mae(pred, target, **kwargs):
+    return torch.abs(target - pred).mean()
 
 
 def make_theta_from_st(st, is_inverse=False):
@@ -331,6 +351,7 @@ def fc_exchange_label(fc, new_pos=None, in_place=False):
         new_fc.weight.data.copy_(w), new_fc.bias.data.copy_(b)
         return new_fc
 
+
 # # We want to crop a 80x80 image randomly for our batch
 # # Building central crop of 80 pixel size
 # grid_source = build_grid(batch.size(2), 80)
@@ -338,3 +359,25 @@ def fc_exchange_label(fc, new_pos=None, in_place=False):
 # grid_shifted = random_crop_grid(batch, grid_source)
 # # Sample using grid sample
 # sampled_batch = F.grid_sample(batch, grid_shifted)
+
+class TransformsWrapFn:
+    # transform wrap from fn(img_tensor, ...) -> img_tensor
+    # Usage:
+    #       TransformsWrapFn(crop_3d_volume, fixed_params=['crop_dim', 'crop_size'], crop_dim=256, crop_size=256)
+    #       TransformsWrapFn(random_zoom, fixed_params=['min_percentage', 'max_percentage'],
+    #           min_percentage=0.7, max_percentage=1.2)
+    def __init__(self, fn, fixed_params=None, **params):
+        """
+        :param fn: callable
+        :param fixed_params: list of param names
+        :param params: param to pass to fn
+        """
+        self.fn = convert_to_obj_or_fn(fn)
+        self.params = params
+        self.fixed_params = fixed_params
+
+    def __call__(self, *args, **kwargs):
+        params = {**kwargs, **self.params}
+        if self.fixed_params is not None:
+            params = {k: params[k] for k in self.fixed_params}
+        return self.fn(*args, **params)

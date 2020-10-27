@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 
-from prlab.gutils import lazy_object_fn_call
+from prlab.common.utils import lazy_object_fn_call
 
 
 class DNNEncoder(nn.Module):
