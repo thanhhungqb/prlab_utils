@@ -22,13 +22,16 @@ from sklearn.metrics import confusion_matrix
 from outside.scikit.plot_confusion_matrix import plot_confusion_matrix
 from outside.stn import STN
 from outside.super_resolution.srnet import SRNet3
+from prlab.common import *
+from prlab.common.dl import pipeline_control_multi
+from prlab.common.utils import load_func_by_name, set_if, npy_arr_pretty_print, encode_and_bind, lazy_object_fn_call
 from prlab.fastai.image_data import SamplerImageList
 from prlab.fastai.utils import general_configure, base_arch_str_to_obj
 from prlab.fastai.video_data import BalancedLabelImageList
-from prlab.gutils import load_func_by_name, set_if, npy_arr_pretty_print, convert_to_obj_or_fn, encode_and_bind, \
-    lazy_object_fn_call
 from prlab.torch.functions import fc_exchange_label
-from prlab.popularlib import *
+
+pipeline_control_multi  # just for old reference, new call should be in prlab.common.dl.pipeline_control_multi
+
 
 def pipeline_control(**kwargs):
     """
@@ -50,48 +53,6 @@ def pipeline_control(**kwargs):
     process_pipeline = [load_func_by_name(o)[0] if isinstance(o, str) else o for o in config['process_pipeline']]
     for fn in process_pipeline:
         config = fn(**config)
-
-    return config
-
-
-def pipeline_control_multi(**kwargs):
-    """
-    For general control overall pipeline, support for multi pipeline
-    See `prlab.fastai.pipeline.pipeline_control`
-    What different:
-        - `prlab.fastai.utils.general_configure` add to pipe instead call directly
-        - support many pipeline in order name (max1000): process_pipeline_0, process_pipeline_1, ...
-        Why process_pipeline in the middle? FOR SUPPORT THE OLDER VERSION of configure file
-    :param kwargs: configure
-    :return:
-    """
-    config = {}
-    config.update(**kwargs)
-
-    ordered_pipeline_names = ['process_pipeline_{}'.format(i) for i in range(1000) if
-                              config.get('process_pipeline_{}'.format(i), None) is not None]
-    # sometime set 'none' instead list to disable it (override json by command line)
-    ordered_pipeline_names = [o for o in ordered_pipeline_names if isinstance(config[o], list)]
-    if len(ordered_pipeline_names) == 0:
-        # support old version of configure file
-        ordered_pipeline_names = ['process_pipeline']
-
-    # TODO
-    #   Do we need object create and call here, if then lazy should be consider for all pipe
-    #   then local and global params should be careful consider
-    #   for lazy load, another problem with module load at runtime also have to care because
-    #   some case, source code are remove immediately after main process run
-    # this step to make sure all name could be convert to function to call later
-    # this is early check
-    for pipe_name in ordered_pipeline_names:
-        convert_to_obj_or_fn(config[pipe_name])
-
-    for pipe_name in ordered_pipeline_names:
-        # the previous output config may be affect the next step of the pipeline,
-        # then convert_to_obj_or_fn should be call after previous step done.
-        process_pipeline = convert_to_obj_or_fn(config[pipe_name])
-        for fn in process_pipeline:
-            config = fn(**config)
 
     return config
 
@@ -1205,50 +1166,9 @@ def make_one_hot_df_pipe(**config):
     return config
 
 
-class PipeClassWrap:
-    """
-    Convert/Wrap pipe function to class style.
-    Note that class style can be easy to use with object or object_lazy with the custom params
-    Usage:
+from prlab.common.utils import PipeClassCallWrap, PipeClassWrap
 
-        def function(**kwargs):
-            print("GeeksforGeeks")
-            print(kwargs)
-
-        obj = PipeClassWrap(fn=function,test='a',o='b')
-        obj(test='override')
-    """
-
-    def __init__(self, fn, **config):
-        self.fn = lazy_object_fn_call(fn, **config)
-        self.config = config
-
-    def __call__(self, *args, **kwargs):
-        # update and override with stored config
-        params = {}
-        params.update(self.config)
-        params.update(kwargs)
-
-        return self.fn(*args, **params)
-
-
-class PipeClassCallWrap:
-    """
-    Wrap a function call with return to a pipe call with update configure
-    """
-
-    def __init__(self, fn, ret_name='out', params=None, map_name=None, **config):
-        self.fn = lazy_object_fn_call(fn, **config)
-        self.fn = self.fn if callable(self.fn) else eval(self.fn)
-        self.ret_name = ret_name
-        self.params = params if params is not None else {}
-        self.map_param_name = {} if map_name is None else map_name
-
-    def __call__(self, *args, **config):
-        new_params = {k: config.get(v) for k, v in self.map_param_name.items()}
-        config[self.ret_name] = self.fn(*args, **{**config, **self.params, **new_params})
-        return config
-
+PipeClassCallWrap, PipeClassWrap  # move to prlab.common.utils, just support old call
 
 # define some popular pipe that can be widely use
 default_conf_pipeline = {
