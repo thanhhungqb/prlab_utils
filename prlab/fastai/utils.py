@@ -20,8 +20,8 @@ from torch.autograd import Variable
 from torch.nn.functional import log_softmax
 
 from outside.scikit.plot_confusion_matrix import plot_confusion_matrix
-from prlab.gutils import convert_to_obj, make_check_point_folder, convert_to_obj_or_fn, load_func_by_name, \
-    lazy_object_fn_call
+from prlab.common.dl import general_dl_make_up
+from prlab.common.utils import convert_to_obj_or_fn, load_func_by_name, lazy_object_fn_call
 from prlab.torch.functions import ExLoss, weights_branches
 
 
@@ -626,26 +626,12 @@ def run_learner_report(learn, data=None, data_test=None, class_names=None, ret_o
 
 
 def general_configure(**config):
-    """
-    Widely used for basic configure for fastai train/test
-    :param config:
-    :return:
-    """
-    config['path'] = Path(config['path'])
-    config['model_path'] = Path(config['model_path'])
-
-    cp, best_name, csv_log = make_check_point_folder(config, None, config.get('run', 'test'))
-    loss_func = config.get('loss_func', None)
+    config = general_dl_make_up(**config)
     config.update({
-        'data_helper': convert_to_obj(config.get('data_helper', None), **config),
-        'metrics': convert_to_obj_or_fn(config.get('metrics', None), **config),
-        'loss_func': convert_to_obj_or_fn(loss_func, **config) if isinstance(loss_func, str) else loss_func,
         'tfms': get_transforms_wrap(xtra_tfms=[], **config),
-        'callback_fn': lambda: get_callbacks(best_name=best_name, csv_filename=csv_log),
-        'cp': cp,
-    })
-    print(cp)
+        'callback_fn': lambda: get_callbacks(best_name=config['best_name'], csv_filename=config['csv_log']),
 
+    })
     return config
 
 

@@ -5,7 +5,7 @@ from fastai.vision import *
 from torch.utils.data import RandomSampler
 
 # ************************************************
-from prlab.gutils import load_func_by_name
+from prlab.common.utils import load_func_by_name
 
 
 class ClassBalancedRandomSampler(RandomSampler):

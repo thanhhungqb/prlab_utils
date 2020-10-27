@@ -1,6 +1,6 @@
 import click
 
-from prlab.gutils import command_run, run_k_fold
+from prlab.common.utils import command_run, run_k_fold
 
 """
 General run by call package with configure from file (JSON) or command line args
