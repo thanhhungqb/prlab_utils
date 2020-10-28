@@ -992,16 +992,3 @@ def get_pipes(base_name, n_max=1000, **config):
 normalize_norm = lambda slices, **kw: (slices - slices.mean()) / slices.std()
 normalize_0_1 = lambda slices, **kw: (slices - slices.min()) / (slices.max() - slices.min())
 normalize_n1_1 = lambda slices, **kw: (slices * 2 - slices.max() - slices.min()) / (slices.max() - slices.min())
-
-
-def test_make_check_point_folder():
-    print(make_check_point_folder("/tmp"))
-
-
-def test_map_str_list_to_type():
-    print(map_str_list_to_type("[1 3 4 6]"))
-    print(map_str_list_to_type("[1 3 4 6]", dtype=int))
-
-
-if __name__ == '__main__':
-    test_map_str_list_to_type()
