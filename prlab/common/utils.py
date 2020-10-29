@@ -989,6 +989,7 @@ def get_pipes(base_name, n_max=1000, **config):
 # ============================ END OF PIPE =================================
 
 # some normalization function
-normalize_norm = lambda slices, **kw: (slices - slices.mean()) / slices.std()
-normalize_0_1 = lambda slices, **kw: (slices - slices.min()) / (slices.max() - slices.min())
-normalize_n1_1 = lambda slices, **kw: (slices * 2 - slices.max() - slices.min()) / (slices.max() - slices.min())
+normalize_norm = lambda slices, **kw: (slices.astype(float) - slices.mean()) / slices.std()
+normalize_0_1 = lambda slices, **kw: (slices.astype(float) - slices.min()) / (slices.max().astype(float) - slices.min())
+normalize_n1_1 = lambda slices, **kw: (slices * 2.0 - slices.max() - slices.min()) / (
+            slices.max().astype(float) - slices.min())
