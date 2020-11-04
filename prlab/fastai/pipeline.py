@@ -12,12 +12,24 @@ Note:
     (TODO keep data for older version use, but remove in future)
     - see `config/general.json` to basic configure for pipeline
 """
+import json
+from functools import partial
+from pathlib import Path
+
 import deprecation
 import nltk
 import sklearn
-from fastai.tabular import tabular_learner
-from fastai.vision import *
+import torch
+import torch.nn as nn
+from fastai.learner import Learner
+from fastai.tabular.learner import tabular_learner
+from fastai.vision import models
+from fastai.vision.core import imagenet_stats
+from fastai.vision.learner import create_cnn_model, unet_learner, ImageDataLoaders, cnn_learner
+from fastcore.basics import listify, defaults
 from sklearn.metrics import confusion_matrix
+from torch import optim
+from torch.optim import AdamW
 
 from outside.scikit.plot_confusion_matrix import plot_confusion_matrix
 from outside.stn import STN
@@ -25,12 +37,14 @@ from outside.super_resolution.srnet import SRNet3
 from prlab.common import *
 from prlab.common.dl import pipeline_control_multi
 from prlab.common.utils import load_func_by_name, set_if, npy_arr_pretty_print, encode_and_bind, lazy_object_fn_call
-from prlab.fastai.image_data import SamplerImageList
+# from prlab.fastai.image_data import SamplerImageList
 from prlab.fastai.utils import general_configure, base_arch_str_to_obj
 from prlab.fastai.video_data import BalancedLabelImageList
 from prlab.torch.functions import fc_exchange_label
 
 pipeline_control_multi  # just for old reference, new call should be in prlab.common.dl.pipeline_control_multi
+
+ImageList = ImageDataLoaders
 
 
 def pipeline_control(**kwargs):
