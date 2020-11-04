@@ -17,6 +17,7 @@ from functools import partial
 from pathlib import Path
 
 import deprecation
+import fastai
 import nltk
 import sklearn
 import torch
@@ -45,6 +46,7 @@ from prlab.torch.functions import fc_exchange_label
 pipeline_control_multi  # just for old reference, new call should be in prlab.common.dl.pipeline_control_multi
 
 ImageList = ImageDataLoaders
+is_fastai_v1 = fastai.__version__ < "2"
 
 
 def pipeline_control(**kwargs):
@@ -336,6 +338,7 @@ def data_load_folder(**config):
     :param config:
     :return: None, new_config (None for learner)
     """
+    assert is_fastai_v1, "only work with fastai v1"
     print('starting load train/valid')
     train_load = SamplerImageList.from_folder(config['path'])
     train_load = train_load.filter_by_func(config['data_helper'].filter_func) \
@@ -482,6 +485,7 @@ def data_load_folder_balanced(**config):
 
 # ********** Segmentation data loader ************
 def load_seg_data(**config):
+    assert is_fastai_v1, "only work with fastai v1"
     dh = config['data_helper']
     bs = config.get('bs', 16)
     classes = config.get('classes', None)
@@ -713,6 +717,7 @@ def make_report_cls(**config):
     :param config: contains data_test store test in valid mode, tta_times (if have)
     :return: as description of `Pipeline Process template` including learn and config (not update in this func)
     """
+    assert is_fastai_v1, "only work with fastai v1"
     print('starting report')
     learn = config['learn']
     cp = config['cp']
@@ -784,6 +789,7 @@ def make_report_general(**config):
     :param config: contains data_test store test in valid mode, tta_times (if have)
     :return: new config
     """
+    assert is_fastai_v1, "only work with fastai v1"
     print('starting report for regression')
     learn = config['learn']
     cp = config['cp']
@@ -840,6 +846,7 @@ def make_report_simple(**config):
     :param config:
     :return: new config with output
     """
+    assert is_fastai_v1, "only work with fastai v1"
     learn = config['learn']
     preds, gt = learn.get_preds(DatasetType.Valid)
 
@@ -860,6 +867,7 @@ def predict_and_save_simple(**config):
     :param config:
     :return: new config with output
     """
+    assert is_fastai_v1, "only work with fastai v1"
     learn = config['learn']
     cp = config['cp']
     preds, gt = learn.get_preds(DatasetType.Valid)
@@ -917,6 +925,7 @@ def make_predict_seg(**config):
 
 @backup_learner_data_decorator
 def predict_and_save(**config):
+    assert is_fastai_v1, "only work with fastai v1"
     print('starting predict_and_save')
 
     learn = config['learn']
