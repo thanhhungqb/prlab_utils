@@ -40,7 +40,6 @@ from prlab.common.dl import pipeline_control_multi
 from prlab.common.utils import load_func_by_name, set_if, npy_arr_pretty_print, encode_and_bind, lazy_object_fn_call
 # from prlab.fastai.image_data import SamplerImageList
 from prlab.fastai.utils import general_configure, base_arch_str_to_obj
-from prlab.fastai.video_data import BalancedLabelImageList
 from prlab.torch.functions import fc_exchange_label
 
 pipeline_control_multi  # just for old reference, new call should be in prlab.common.dl.pipeline_control_multi
@@ -437,6 +436,7 @@ def data_load_folder_balanced(**config):
     :param config:
     :return: None, new_config (None for learner)
     """
+    assert is_fastai_v1, "only work with fastai v1"
     image_list_cls = BalancedLabelImageList
     train_load = image_list_cls.from_folder(path=config['path'], data_helper=config['data_helper'],
                                             each_class_num=config['each_class_num'])
