@@ -30,8 +30,38 @@ def model_general_setup(**config):
     :param config:
     :return:
     """
-    config['opt_func'] = convert_to_obj_or_fn(config['opt_func'], params=config['model'].parameters())
+    config = opt_setup(**config)
     config['loss_func'] = convert_to_obj_or_fn(config['loss_func'], **config)
     config['metrics'] = convert_to_obj_or_fn(config['metrics'], **config)
+
+    return config
+
+
+def opt_setup(**config):
+    """
+    Setup for opt func, support single lr and per-parameter
+    :param config:
+    :return:
+    """
+    if callable(config['opt_func']):
+        return config
+
+    if isinstance(config['opt_func'], list):
+        if isinstance(config['opt_func'][-1].get('lr', 1e-2), list):  # per-parameter lr
+            # then model should has layer_groups
+            assert hasattr(config['model'], 'layer_groups'), "model should has layer_groups"
+            groups = config['model'].layer_groups()
+            lrs = config['opt_func'][-1]['lr']
+            assert len(groups) == len(lrs), "should same size"
+
+            # make param by groups and its lr
+            params = [{'params': groups[i].parameters(), 'lr': lrs[i]} for i in range(len(groups))]
+
+            pass_params = {**config['opt_func'][-1], 'params': params, 'lr': lrs[-1]}
+            config['opt_func'] = convert_to_obj_or_fn(config['opt_func'][:2] + [pass_params])
+        else:  # should be single lr
+            config['opt_func'] = convert_to_obj_or_fn(config['opt_func'], params=config['model'].parameters())
+    else:  # str, etc.
+        config['opt_func'] = convert_to_obj_or_fn(config['opt_func'], params=config['model'].parameters())
 
     return config
