@@ -539,31 +539,59 @@ def command_run(ctx, run_id, json_conf):
     """
     print('run ID', run_id)
 
+    config = load_json_conf(ctx=ctx, json_conf=json_conf)
+    # load function by str
+    fn, mod_ = load_func_by_name(config['call'])
+    out = fn(**config)
+
+    print(out)
+
+
+def load_json_conf(ctx, json_conf, max_conf_file=20, **kwargs):
+    """
+    To work with command_run and run_k_fold
+    :param ctx: from click context
+    :param json_conf:
+    :param max_conf_file: maximum number of configure file
+    :param kwargs:
+    :return:
+    """
+
+    def load_depend_conf(**conf):
+        while conf.get('depend_on') is not None:
+            dependent = conf['depend_on']
+            del conf['depend_on']
+            if isinstance(dependent, dict):
+                conf = {**dependent, **conf}
+                # conf.update(dependent)
+            else:
+                with open(dependent) as f_depend:
+                    conf = {**json.load(fp=f_depend), **conf}
+                    # conf.update(json.load(fp=f_depend))
+        return conf
+
     config = {}
     if json_conf:
         with open(json_conf) as fp:
             config = json.load(fp=fp)
+            config = load_depend_conf(**config)
         config['json_conf'] = json_conf
 
     extra_args = parse_extra_args_click(ctx)
     config.update(**extra_args)
 
     # all other configure json_conf2, ... will be in config too
-    for idx in range(20):
+    for idx in range(max_conf_file):
         additional_conf = 'json_conf{}'.format(idx)
         if config.get(additional_conf, None) is not None:
             with open(config[additional_conf]) as fp:
                 config2 = json.load(fp=fp)
+                config2 = load_depend_conf(**config2)
                 config.update(**config2)
 
     #  one more time to override configure from command line
     config.update(**extra_args)
-
-    # load function by str
-    fn, mod_ = load_func_by_name(config['call'])
-    out = fn(**config)
-
-    print(out)
+    return config
 
 
 @click.command(name='run_k_fold', context_settings=dict(
@@ -584,24 +612,7 @@ def run_k_fold(ctx, run_id, json_conf):
     """
     print('run ID', run_id)
 
-    config = {}
-    if json_conf:
-        with open(json_conf) as fp:
-            config = json.load(fp=fp)
-
-    extra_args = parse_extra_args_click(ctx)
-    config.update(**extra_args)
-
-    # all other configure json_conf2, ... will be in config too
-    for idx in range(20):
-        additional_conf = 'json_conf{}'.format(idx)
-        if config.get(additional_conf, None) is not None:
-            with open(config[additional_conf]) as fp:
-                config2 = json.load(fp=fp)
-                config.update(**config2)
-
-    #  one more time to override configure from command line
-    config.update(**extra_args)
+    config = load_json_conf(ctx=ctx, json_conf=json_conf)
 
     config['run_id'] = run_id
     set_if(config, 'k', 5)
@@ -978,19 +989,7 @@ def get_pipes(base_name, n_max=1000, **config):
 # ============================ END OF PIPE =================================
 
 # some normalization function
-normalize_norm = lambda slices, **kw: (slices - slices.mean()) / slices.std()
-normalize_0_1 = lambda slices, **kw: (slices - slices.min()) / (slices.max() - slices.min())
-normalize_n1_1 = lambda slices, **kw: (slices * 2 - slices.max() - slices.min()) / (slices.max() - slices.min())
-
-
-def test_make_check_point_folder():
-    print(make_check_point_folder("/tmp"))
-
-
-def test_map_str_list_to_type():
-    print(map_str_list_to_type("[1 3 4 6]"))
-    print(map_str_list_to_type("[1 3 4 6]", dtype=int))
-
-
-if __name__ == '__main__':
-    test_map_str_list_to_type()
+normalize_norm = lambda slices, **kw: (slices.astype(float) - slices.mean()) / slices.std()
+normalize_0_1 = lambda slices, **kw: (slices.astype(float) - slices.min()) / (slices.max().astype(float) - slices.min())
+normalize_n1_1 = lambda slices, **kw: (slices * 2.0 - slices.max() - slices.min()) / (
+            slices.max().astype(float) - slices.min())
