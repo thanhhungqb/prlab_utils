@@ -168,3 +168,15 @@ class meaningless_ctx:
 
     def __exit__(self, *args):
         return False
+
+
+def seed_set(**config):
+    """
+    Setup seed if given then experiment could be reproducibility.
+    Work with torch and numpy only.
+    """
+    seed = config.get('seed')
+    if seed is not None:
+        torch.manual_seed(seed)
+        np.random.seed(seed)
+    return config
