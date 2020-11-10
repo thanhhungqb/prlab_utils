@@ -381,3 +381,6 @@ class TransformsWrapFn:
         if self.fixed_params is not None:
             params = {k: params[k] for k in self.fixed_params}
         return self.fn(*args, **params)
+
+    def __str__(self):
+        return f"prlab.torch.functions.TransformsWrapFn ( {str(self.fn)} )"

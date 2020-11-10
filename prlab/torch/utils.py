@@ -3,6 +3,7 @@ import logging
 import time
 
 import numpy as np
+import pandas as pd
 import torch
 
 from prlab.common.utils import convert_to_obj_or_fn, to_json_writeable
@@ -34,12 +35,13 @@ def train_control(**config):
         if val_best_loss is None or val_loss < val_best_loss:
             # TODO best valid callback
             val_best_loss, val_best_score = val_loss, val_score
+            torch.save(config['model'].state_dict(), config['cp'] / 'best.w')
 
         metrics = {
             'epoch': epoch,
             'train_loss': float(train_loss),
             'val_loss': float(val_loss),
-            "time": "{:.2f}".format((time.time() - start_time)),
+            "time": time.time() - start_time,
         }
         metrics = {**metrics,
                    **{f'train_{metric_names[i]}': float(train_score[i]) for i in range(len(train_score))},
@@ -73,13 +75,40 @@ def eval_control(**config):
     test_loss, val_score, *_ = one_epoch(test_mode=True, **to_test_config)
 
     metrics = {'test_loss': float(test_loss),
-               "time": "{:.2f}".format((time.time() - start_time)),
+               "time": time.time() - start_time,
                **{f'test_{metric_names[i]}': float(val_score[i]) for i in range(len(val_score))}}
 
     msg1 = to_json_writeable(metrics)
     progress_logger.info(json.dumps(msg1))
     train_logger.info(json.dumps(msg1))
 
+    return config
+
+
+def predict_control(**config):
+    """
+    similar to `eval_control` but predict and save results
+    """
+    train_logger = config.get('train_logger', logger)
+    train_logger.info("** start predicting ...")
+
+    start_time = time.time()
+
+    data_loader = config['data_test']
+    model = config['model']
+
+    out = []
+    model.eval()
+    with torch.no_grad():
+        for idx, (i_features, i_targets) in enumerate(data_loader):
+            features, targets = process_input(i_features=i_features, i_targets=i_targets, **config)
+            predictions = model(features)
+            predictions = torch.squeeze(predictions, -1)
+            out = out + predictions.cpu().detach().numpy().tolist()
+
+    config['out'] = pd.DataFrame({'pid': config['test_df']['pid'], 'predict': out})
+
+    train_logger.info(f"** predict done in {time.time() - start_time}s!")
     return config
 
 
@@ -167,3 +196,15 @@ class meaningless_ctx:
 
     def __exit__(self, *args):
         return False
+
+
+def seed_set(**config):
+    """
+    Setup seed if given then experiment could be reproducibility.
+    Work with torch and numpy only.
+    """
+    seed = config.get('seed')
+    if seed is not None:
+        torch.manual_seed(seed)
+        np.random.seed(seed)
+    return config
