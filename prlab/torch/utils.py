@@ -40,7 +40,7 @@ def train_control(**config):
             'epoch': epoch,
             'train_loss': float(train_loss),
             'val_loss': float(val_loss),
-            "time": "{:.2f}".format((time.time() - start_time)),
+            "time": time.time() - start_time,
         }
         metrics = {**metrics,
                    **{f'train_{metric_names[i]}': float(train_score[i]) for i in range(len(train_score))},
