@@ -6,6 +6,9 @@ Class Pipe also supported:
         def __call__(**config:dict) -> config(dict)
 """
 import logging
+from pathlib import Path
+
+import torch
 
 from prlab.common.utils import convert_to_obj_or_fn
 
@@ -16,6 +19,31 @@ def simple_model(**config):
     config['model'] = convert_to_obj_or_fn(config['model']).to(config.get('device', 'cuda'))
     return config
 
+
+def model_load_weights(**config):
+    """
+    Load model weights, should be call after model available
+    Require:
+        model
+        strict (opt) to check parameters name
+        cp (Path)
+        loggers
+    """
+    model = config['model']
+    model_weights_path = config.get('model_weights_path', config['cp'] / 'best.w')
+    model_weights_path = Path(model_weights_path)
+
+    if model_weights_path.is_file():
+        train_logger = config.get('train_logger', logger)
+        train_logger.info(f"try to load weights from {str(model_weights_path)}")
+
+        out = model.load_state_dict(torch.load(model_weights_path), strict=config.get('strict', False))
+        train_logger.info(f"load weights msg:\n {str(out)}")
+
+    return config
+
+
+# ================= ENF OF MODEL PART ==================
 
 def opt_func_load(**config):
     # TODO fix opt load, maybe wrap to object to predefined params, such as lr, ...
