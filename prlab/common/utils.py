@@ -891,6 +891,32 @@ def train_test_split_fold(**config):
     return config
 
 
+def train_test_split_fold_by_keys(**config):
+    """
+    Split by Participant_id for train/test, using only fold_key to split (not randomly), and full of train/valid
+    :param config:
+    :return:
+    """
+    df = config['df']
+    fold_key = config.get('fold_key', 'fold')
+    test_fold = config.get('test_fold', config.get('fold', 1))
+    test_fold = test_fold if isinstance(test_fold, list) else [test_fold]
+
+    config['test_df'] = df[df[fold_key].isin(test_fold)]
+    config['train_df'] = df[~df[fold_key].isin(test_fold)]
+
+    # valid
+    valid_fold = config.get('valid_fold', None)
+    if valid_fold is None:
+        valid_fold = random.choice(config['train_df'][fold_key])
+    valid_fold = valid_fold if isinstance(valid_fold, list) else [valid_fold]
+
+    config['valid_df'] = df[df[fold_key].isin(valid_fold)]
+    config['train_df'] = df[~df[fold_key].isin(valid_fold)]
+
+    return config
+
+
 class NameSpaceDict(dict):
     def __init__(self, *arg, **kw):
         super().__init__(*arg, **kw)
@@ -992,4 +1018,4 @@ def get_pipes(base_name, n_max=1000, **config):
 normalize_norm = lambda slices, **kw: (slices.astype(float) - slices.mean()) / slices.std()
 normalize_0_1 = lambda slices, **kw: (slices.astype(float) - slices.min()) / (slices.max().astype(float) - slices.min())
 normalize_n1_1 = lambda slices, **kw: (slices * 2.0 - slices.max() - slices.min()) / (
-            slices.max().astype(float) - slices.min())
+        slices.max().astype(float) - slices.min())
