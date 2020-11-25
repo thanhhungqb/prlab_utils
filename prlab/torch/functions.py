@@ -63,6 +63,14 @@ class MSELossE(WrapLoss):
     _wrap = nn.MSELoss
 
 
+class CrossEntropyLossE(nn.CrossEntropyLoss):
+    def __init__(self, size_average=None, **kwargs):
+        super(CrossEntropyLossE, self).__init__(size_average=size_average)
+
+    def forward(self, input, target):
+        return super().forward(input, target)
+
+
 def prob_weights_loss(pred, target, **kwargs):
     """
     `CrossEntropyLoss` but for multi branches (out, weight) :([bs, C, branches], [bs, branches])
