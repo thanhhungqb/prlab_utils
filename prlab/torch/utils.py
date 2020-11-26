@@ -82,6 +82,8 @@ def eval_control(**config):
     progress_logger.info(json.dumps(msg1))
     train_logger.info(json.dumps(msg1))
 
+    config['output'] = np.array([float(o) for o in val_score])
+
     return config
 
 
