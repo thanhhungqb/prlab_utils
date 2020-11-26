@@ -629,7 +629,7 @@ def run_k_fold(ctx, run_id, json_conf):
         out.append(fn(**config))
         # support for dict['output'], correctly follow the template
         if isinstance(out[-1], dict):
-            out[-1] = out[-1]['output']
+            out[-1] = out[-1].get('output', 0)
 
     print(out)
     try:
