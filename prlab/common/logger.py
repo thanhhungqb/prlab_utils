@@ -25,7 +25,8 @@ class WandbHandler(Handler):
 
         name = config.get('proj_name', 'default')
         cp = config.get('cp', './wandb')
-        wandb.init(name=config.get('run'), project=name, dir=cp)
+        run_name = "{}{}".format(config.get('run', 'run'), config.get('test_fold', config.get('fold', '')))
+        wandb.init(name=run_name, project=name, dir=cp)
         wandb.save(str((Path(cp) / 'configure.json').absolute())) if (Path(cp) / 'configure.json').is_file() else None
 
     def set_model(self, model):
