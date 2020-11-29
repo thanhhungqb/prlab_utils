@@ -82,6 +82,8 @@ def eval_control(**config):
     progress_logger.info(json.dumps(msg1))
     train_logger.info(json.dumps(msg1))
 
+    config['output'] = np.array([float(o) for o in val_score])
+
     return config
 
 
@@ -185,7 +187,7 @@ def one_epoch(model, loss_func, opt_func, data_loader=None, test_mode=False, **c
             labels_corr += targets
 
     loss_val = running_loss / n_count
-    predictions_corr, labels_corr = torch.tensor(predictions_corr), torch.tensor(labels_corr)
+    predictions_corr, labels_corr = torch.stack(predictions_corr), torch.stack(labels_corr)
     metric_scores = process_metrics(preds_tensor=predictions_corr, targets_tensor=labels_corr, **config)
     return loss_val, metric_scores
 

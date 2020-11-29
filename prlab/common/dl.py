@@ -80,8 +80,7 @@ def general_dl_make_up(**config):
 
 def make_train_loggers(**config):
     """ There are two logger including general logger to stdout/file and another to progress (stdout/wandb)"""
-    name = config.get('run', 'general')
-    proj_name = config.get('proj_name', name)
+    name = "{}{}".format(config.get('run', 'general'), config.get('test_fold', config.get('fold', '')))
     log_level = config.get('log_level', logging.INFO)
 
     logger_general = logging.getLogger(name)
