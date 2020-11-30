@@ -1,15 +1,24 @@
 """
 Wrap exist class, function in fastai for some special task
 """
-from fastai.tabular import *
+
+import torch
+import torch.nn as nn
+from fastai.tabular.model import TabularModel
+from fastcore.basics import listify, ifnone
 
 
-def get_tabular_model(data_train: DataBunch, layers: Collection[int],
+def get_tabular_model(data_train, layers,
                       out_sz=None,
-                      emb_szs: Dict[str, int] = None,
-                      ps: Collection[float] = None, emb_drop: float = 0., y_range: OptRange = None, use_bn: bool = True,
+                      emb_szs=None,
+                      ps=None, emb_drop: float = 0., y_range=None, use_bn: bool = True,
                       **kwargs):
-    """Wrap `fastai.tabular.learner.tabular_learner` to get model only"""
+    """
+    Wrap `fastai.tabular.learner.tabular_learner` to get model only
+    TODO upgrade to fastai v2
+    data_train:DataBunch, emb_szs: Dict[str, int], y_range: OptRange
+    layers: Collection[int], ps: Collection[float]
+    """
     emb_szs = data_train.get_emb_szs(ifnone(emb_szs, {}))
     model = TabularModelEx(emb_szs, len(data_train.cont_names),
                            out_sz=data_train.c if out_sz is None else out_sz,
@@ -25,45 +34,30 @@ class TabularModelEx(TabularModel):
     If is_only_output then the class equals to original version, else return the embedded_x to use outside
     """
 
-    def __init__(self, emb_szs, n_cont: int, out_sz: int, layers: Collection[int],
-                 ps: Collection[float] = None, emb_drop: float = 0., y_range: OptRange = None,
-                 use_bn: bool = True, bn_final: bool = False,
+    def __init__(self, emb_szs, n_cont, out_sz, layers, ps=None, embed_p=0.,
+                 y_range=None, use_bn=True, bn_final=False, bn_cont=True, act_cls=nn.ReLU(inplace=True),
                  is_only_output=True,
-                 **kwargs):
-
-        # support lazy calculate/make for emb_szs
-        # see `fastai.tabular.learner.tabular_learner` and `fastai.tabular.models.TabularModel`, there is different of
-        # meaning of emb_szs (ListSizes and Dict)
-        if isinstance(emb_szs, dict):  # TODO how to check ListSizes
-            # in this case, lazy calc is used, data_train should be here
-            data_train = kwargs.get('data_train')
-            emb_szs = data_train.get_emb_szs(ifnone(emb_szs, {}))
-
+                 **kw):
         super(TabularModelEx, self).__init__(
-            emb_szs=emb_szs, n_cont=n_cont,
-            out_sz=out_sz, layers=layers,
-            ps=ps, emb_drop=emb_drop,
-            y_range=y_range,
-            use_bn=use_bn, bn_final=bn_final
+            emb_szs=emb_szs, n_cont=n_cont, out_sz=out_sz, layers=layers, ps=ps, embed_p=embed_p,
+            y_range=y_range, use_bn=use_bn, bn_final=bn_final, bn_cont=bn_cont, act_cls=act_cls
         )
-
         self.is_only_output = is_only_output
 
-    def forward(self, x_cat: Tensor, x_cont: Tensor) -> Tensor:
+    def forward(self, x_cat, x_cont=None, **kw):
+        x_p = x_cont  # x_p keep original input vector after embedding without dropout
         if self.n_emb != 0:
             x = [e(x_cat[:, i]) for i, e in enumerate(self.embeds)]
             x = torch.cat(x, 1)
+            x_p = x
             x = self.emb_drop(x)
         if self.n_cont != 0:
-            # x_cont = self.bn_cont(x_cont)
-            # TODO fix problem, value to be large when use bn, think about use embedded_x without bn
+            if self.bn_cont is not None: x_cont = self.bn_cont(x_cont)
             x = torch.cat([x, x_cont], 1) if self.n_emb != 0 else x_cont
+            x_p = torch.cat([x_p, x_cont], dim=-1)
 
-        embedded_x = x
-        x = self.layers(x)
-        if self.y_range is not None:
-            x = (self.y_range[1] - self.y_range[0]) * torch.sigmoid(x) + self.y_range[0]
-        return x if self.is_only_output else (x, embedded_x)
+        out = self.layers(x)
+        return out if self.is_only_output else (out, x_p)
 
 
 class SimpleDNN(nn.Module):
