@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 
-from prlab.common.utils import lazy_object_fn_call
+from prlab.common.utils import lazy_object_fn_call, convert_to_obj_or_fn
 
 
 class DNNEncoder(nn.Module):
@@ -243,3 +243,49 @@ class MultiDecoderVAE(GeneralVAE):
         x_sample = torch.randn(1, latent_dim).to(device)
         predicted = self.decoder(x_sample)
         return predicted
+
+
+class MultiTaskVAELoss(nn.Module):
+    """
+    This class work together with MultiDecoderVAE, the number of loss function should be equals to 1+len(second_decoder)
+    Not that x should be pass through the model in `pred`
+    """
+
+    def __init__(self, loss, second_loss=[], lw=[], **kwargs):
+        """
+
+        :param loss: VAE loss function
+        :param second_loss: other loss function, all loss should return same shape
+        :param lw: len = 1 + len(second_loss), maybe number or a object (manage weight itself)
+        :param kwargs:
+        """
+        super(MultiTaskVAELoss, self).__init__()
+
+        # support lazy calc to make object if not yet for all loss
+        self.loss = convert_to_obj_or_fn(loss)
+
+        self.second_loss = second_loss if isinstance(second_loss, list) else [second_loss]
+        self.second_loss = [lazy_object_fn_call(o, **kwargs) for o in self.second_loss]
+
+        self.cat_loss = [self.loss] + self.second_loss
+
+        # loss weights
+        if len(lw) == 0: lw = [1] * (1 + len(second_loss))
+        assert len(lw) == 1 + len(second_loss)
+        self.lw = [o if callable(o) else (lambda: o) for o in lw]
+
+    def forward(self, pred, target, **kwargs):
+        # using vae_pred, second and maybe x_p
+        vae_pred, z_mu, z_var, second, x_p, *_ = pred
+        x_pred = [vae_pred, *second]
+        x_target = [x_p, *target]
+
+        out_loss = [fw() * floss(p, t) for floss, p, t, fw in zip(self.cat_loss, x_pred, x_target, self.lw)]
+
+        out_loss = torch.stack(out_loss)
+        b_loss = torch.sum(out_loss, dim=-1)
+
+        return torch.mean(b_loss)
+
+    def __repr__(self):
+        return f"MultiTaskVAELoss ( {[str(o) for o in self.cat_loss]} )"
