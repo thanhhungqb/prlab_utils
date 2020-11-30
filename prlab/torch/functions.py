@@ -64,10 +64,13 @@ class MSELossE(WrapLoss):
 
 
 class CrossEntropyLossE(nn.CrossEntropyLoss):
-    def __init__(self, size_average=None, **kwargs):
-        super(CrossEntropyLossE, self).__init__(size_average=size_average)
+    def __init__(self, size_average=None,
+                 ignore_index: int = -100,
+                 reduction: str = 'mean', **kwargs):
+        super(CrossEntropyLossE, self).__init__(size_average=size_average, ignore_index=ignore_index,
+                                                reduction=reduction)
 
-    def forward(self, input, target):
+    def forward(self, input, target, **kw):
         return super().forward(input, target)
 
 
