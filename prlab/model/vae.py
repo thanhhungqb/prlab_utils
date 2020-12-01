@@ -270,8 +270,7 @@ class MultiTaskVAELoss(nn.Module):
         self.cat_loss = [self.loss] + self.second_loss
 
         # loss weights
-        if len(lw) == 0: lw = [1] * (1 + len(second_loss))
-        assert len(lw) == 1 + len(second_loss)
+        lw = [1] * (1 + len(second_loss) - len(lw))  # padding 1 at the end if needed
         self.lw = [o if callable(o) else (lambda: o) for o in lw]
 
     def forward(self, pred, target, **kwargs):
