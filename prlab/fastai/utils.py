@@ -7,15 +7,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torchvision
-from fastai import callbacks
-from fastai.basic_data import DatasetType
-from fastai.basic_train import Learner
-from fastai.callback import Callback
-from fastai.callbacks import SaveModelCallback, CSVLogger
-from fastai.metrics import top_k_accuracy, accuracy, dice
-from fastai.torch_core import MetricsList
-from fastai.train import ClassificationInterpretation
-from fastai.vision import imagenet_stats, get_transforms, models, open_image
+from fastai.callback.core import Callback
+from fastai.callback.progress import CSVLogger
+from fastai.callback.tracker import SaveModelCallback
+from fastai.interpret import ClassificationInterpretation
+from fastai.learner import Learner
+from fastai.metrics import accuracy, top_k_accuracy
+from fastai.vision import models
+from fastai.vision.core import imagenet_stats
 from torch.autograd import Variable
 from torch.nn.functional import log_softmax
 
@@ -457,6 +456,3 @@ top2_acc.__name__ = 'top2_accuracy'
 top3_acc.__name__ = 'top3_accuracy'
 top5_acc.__name__ = 'top5_accuracy'
 tmetrics = [accuracy, top2_acc, top3_acc]
-
-iou = partial(dice, iou=True)
-iou.__name__ = 'iou'
