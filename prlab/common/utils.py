@@ -843,6 +843,53 @@ def merge_xlsx(files, merged_file=None):
     return merged_df
 
 
+class CategoricalEncoderPandas:
+    def __init__(self, cat_names, **config):
+        self.encoders = {cat: preprocessing.LabelEncoder() for cat in cat_names}
+        self.cat_names = cat_names
+        self.nan = '#NA#'
+
+    def __getitem__(self, cat_name):
+        return self.encoders[cat_name]
+
+    def fit(self, cat_name, values, **config):
+        # add #NA# to index 0
+        return self.encoders[cat_name].fit(list(values) + [self.nan])
+
+    def fit_df(self, df, **config):
+        """" fit whole dataframe, but only get categorical columns """
+        for cat_name in self.cat_names:
+            self.fit(cat_name=cat_name, values=df[cat_name])
+
+    def transform(self, cat_name, values=[], **config):
+        # if value is not in ... then return #NA#
+        ret = []
+        encoder = self.encoders[cat_name]
+        for value in values:
+            try:
+                ret.append(encoder.transform([value]))
+            except:
+                ret.append(encoder.transform([self.nan]))
+        return ret
+
+    def inverse_transform(self, cat_name, values=[], **config):
+        ret = []
+        encoder = self.encoders[cat_name]
+        for value in values:
+            try:
+                ret.append(encoder.inverse_transform([value]))
+            except:
+                ret.append(encoder.inverse_transform([self.nan]))
+        return ret
+
+    def get_class(self, cat_name, **config):
+        return self.encoders[cat_name].classes_
+
+    def __repr__(self):
+        d = {k: v.classes_ for k, v in self.encoders.items()}
+        return f"CategoricalEncoderPandas: {str(d)}"
+
+
 def train_test_split_fold(**config):
     """
     Split train/test/valid? by fold mode
