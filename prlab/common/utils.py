@@ -844,10 +844,11 @@ def merge_xlsx(files, merged_file=None):
 
 
 class CategoricalEncoderPandas:
-    def __init__(self, cat_names, **config):
+    def __init__(self, cat_names, df=None, **config):
         self.encoders = {cat: preprocessing.LabelEncoder() for cat in cat_names}
         self.cat_names = cat_names
         self.nan = '#NA#'
+        self.fit_df(df=df) if df is not None else None
 
     def __getitem__(self, cat_name):
         return self.encoders[cat_name]
