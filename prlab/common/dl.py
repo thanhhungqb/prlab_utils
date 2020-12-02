@@ -47,7 +47,7 @@ def pipeline_control_multi(**kwargs):
         process_pipeline = convert_to_obj_or_fn(config[pipe_name])
         for fn in process_pipeline:
             print(f'running {str(fn)} ...')
-            fn = convert_to_obj_or_fn(fn, lazy=True)
+            fn = convert_to_obj_or_fn(fn, lazy=True, **config)
             if callable(fn):
                 config = fn(**config)
             else:
