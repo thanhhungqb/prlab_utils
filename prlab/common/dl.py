@@ -1,4 +1,5 @@
 import logging
+import math
 from pathlib import Path
 
 from prlab.common.logger import PrettyLineHandler, WandbHandler
@@ -96,4 +97,22 @@ def make_train_loggers(**config):
         logger_progress.addHandler(WandbHandler(**config))
 
     return {**config, 'train_logger': logger_general, 'progress_logger': logger_progress}
+
+
 # ========================  END OF GENERAL ========================
+
+
+class WeightByCall:
+    """
+    Make weight by the number of call (number of batch).
+    Usually to control of multi-branches of loss function. e.g. first 5 epoch with w=0.1, next it 1
+    """
+
+    def __init__(self, fn=math.tanh, n_batch=1, **kwargs):
+        self.call_count = 0
+        self.fn = convert_to_obj_or_fn(fn)
+        self.n_batch = n_batch
+
+    def __call__(self, *args, **kwargs):
+        self.call_count += 1
+        return self.fn(self.call_count / self.n_batch)
