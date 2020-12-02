@@ -202,7 +202,7 @@ def get_callbacks(best_name='best', monitor='valid_loss', csv_filename='log', cs
     return out
 
 
-def dificult_weight_loss(pred, target, *args, **kwargs):
+def difficult_weight_loss(pred, target, *args, **kwargs):
     """
     loss = - 1 * log(pi) * (pj/pi), where pj is max(p_)
     :param pred:
@@ -222,6 +222,9 @@ def dificult_weight_loss(pred, target, *args, **kwargs):
     xaa = 1 + xa + a
     a = a * xaa
     return torch.mean(a)
+
+
+dificult_weight_loss = difficult_weight_loss
 
 
 def prob_acc(pred, target, **kwargs):
