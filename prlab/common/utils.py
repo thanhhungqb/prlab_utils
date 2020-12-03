@@ -886,6 +886,9 @@ class CategoricalEncoderPandas:
     def get_class(self, cat_name, **config):
         return self.encoders[cat_name].classes_
 
+    def get_size(self):
+        return [len(self.encoders[cat_name].classes_) for cat_name in self.cat_names]
+
     def __repr__(self):
         d = {k: v.classes_ for k, v in self.encoders.items()}
         return f"CategoricalEncoderPandas: {str(d)}"
