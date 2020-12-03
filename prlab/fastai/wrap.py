@@ -45,6 +45,10 @@ class TabularModelEx(TabularModel):
         self.is_only_output = is_only_output
 
     def forward(self, x_cat, x_cont=None, **kw):
+        if isinstance(x_cat, list):
+            # pass cat and cont in form of list 2 elements
+            x_cat, x_cont, *_ = x_cat
+
         x_p = x_cont  # x_p keep original input vector after embedding without dropout
         if self.n_emb != 0:
             x = [e(x_cat[:, i]) for i, e in enumerate(self.embeds)]
