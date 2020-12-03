@@ -278,7 +278,7 @@ class MultiTaskVAELoss(nn.Module):
         # using vae_pred, second and maybe x_p
         vae_pred, z_mu, z_var, second, x_p, *_ = pred
         x_pred = [vae_pred, *second]
-        x_target = [x_p, *target]
+        x_target = [x_p, *target] if len(second) > 1 else [x_p, target]
 
         out_loss = [fw() * floss(p, t) for floss, p, t, fw in zip(self.cat_loss, x_pred, x_target, self.lw)]
 
