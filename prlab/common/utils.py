@@ -1009,9 +1009,25 @@ class PipeClassWrap:
         return self.fn(*args, **params)
 
 
+def params_mapping(params, map_param_name={}, fixed_params=None, **config):
+    """
+    Param mapping/reorder to pass, usually using with named params
+    :param params: current params, may be override config, but map should override it {name:value}
+    :param map_param_name: highest priority params, mapping from config with new name {new_name:old_name_in_config}
+    :param fixed_params: [name], name of fixed params to pass, all others will be omitted
+    :param config: other params, lowest priority
+    :return:
+    """
+    new_params = {k: config.get(v) for k, v in map_param_name.items()}
+    to_pass = {**config, **params, **new_params}
+    if fixed_params is not None:
+        to_pass = {k: v for k, v in to_pass.items() if k in fixed_params}
+    return to_pass
+
+
 class PipeClassCallWrap:
     """
-    Wrap a function call with return to a pipe call with update configure
+    Wrap a function/object call with return to a pipe call with update configure
     """
 
     def __init__(self, fn, ret_name='out', params=None, map_name=None, fixed_params=None, **config):
@@ -1023,15 +1039,37 @@ class PipeClassCallWrap:
         self.fixed_params = fixed_params  # support for class/func that has fixed number params (does not allow **kw)
 
     def __call__(self, *args, **config):
-        new_params = {k: config.get(v) for k, v in self.map_param_name.items()}
-        to_pass = {**config, **self.params, **new_params}
-        if self.fixed_params is not None:
-            to_pass = {k: v for k, v in to_pass.items() if k in self.fixed_params}
+        to_pass = params_mapping(params=self.params, map_param_name=self.map_param_name,
+                                 fixed_params=self.fixed_params, **config)
         config[self.ret_name] = self.fn(*args, **to_pass)
         return config
 
     def __repr__(self):
         return f"PipeClassCallWrap ( {str(self.fn)} )"
+
+
+class PipeObjectMake:
+    """
+    Just make object from information and store to config, similar with PipeClassCallWrap but does not eval fn at the
+    make time.
+    Just using for object make, do not use with function
+    """
+
+    def __init__(self, fn, ret_name='out', params=None, map_name=None, fixed_params=None, **config):
+        self.fn = fn
+        self.ret_name = ret_name
+        self.params = params if params is not None else {}
+        self.map_param_name = {} if map_name is None else map_name
+        self.fixed_params = fixed_params  # support for class/func that has fixed number params (does not allow **kw)
+
+    def __call__(self, *args, **config):
+        to_pass = params_mapping(params=self.params, map_param_name=self.map_param_name,
+                                 fixed_params=self.fixed_params, **config)
+        config[self.ret_name] = convert_to_obj_or_fn(self.fn, lazy=True, *args, **to_pass)
+        return config
+
+    def __repr__(self):
+        return f"PipeObjectMake ( {str(self.fn)} )"
 
 
 def get_pipes(base_name, n_max=1000, **config):
