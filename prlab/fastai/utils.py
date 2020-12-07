@@ -157,7 +157,8 @@ class ECSVLogger(CSVLogger):
     def __init__(self, learn: Learner, filename: str = 'history', append: bool = False):
         super(ECSVLogger, self).__init__(learn, filename, append)
 
-    def on_epoch_end(self, epoch: int, smooth_loss: torch.Tensor, last_metrics: MetricsList, **kwargs: Any) -> bool:
+    def on_epoch_end(self, epoch: int, smooth_loss: torch.Tensor, last_metrics, **kwargs: Any) -> bool:
+        """ fastai v1, last_metrics: MetricsList"""
         super().on_epoch_end(epoch, smooth_loss, last_metrics, **kwargs)
         self.file.flush()  # to make sure write to disk
 
@@ -179,8 +180,9 @@ class DataArgCallBack(Callback):
         self.transform_size = transform_size
         self.normalize = normalize
 
-    def on_epoch_end(self, epoch: int, smooth_loss: torch.Tensor, last_metrics: MetricsList, **kwargs: Any) -> bool:
+    def on_epoch_end(self, epoch: int, smooth_loss: torch.Tensor, last_metrics, **kwargs: Any) -> bool:
         # do with data
+        """ fastai v1, last_metrics: MetricsList"""
         n_data = (self.src
                   .label_from_func(self.label_func)
                   .transform([[], []], size=self.transform_size)
