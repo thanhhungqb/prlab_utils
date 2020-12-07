@@ -118,6 +118,43 @@ def weights_branches(pred, **kwargs):
     return c_out
 
 
+# ====================== METRICS ========================
+class CompoundMetric:
+    """
+    one or more loss function in single tensor. e.g. [bs, 5] with reg in [bs, 0:1] and cls in [bs, 1:]
+    """
+
+    def __init__(self, metric_fns, cut_points, ret_only=None, **kwargs):
+        """
+        :param metric_fns: metric function/class callable
+        :param cut_points: cut_point in second of input [bs, ?, ...], len(cut_point) = len(metric_fns)-1
+        :param ret_only: int or None, what metric (only one) should be return, None if return all
+        """
+        super().__init__()
+        assert len(metric_fns) - 1 == len(cut_points)
+        self.metric_fns = [convert_to_obj_or_fn(o) for o in metric_fns]
+        self.cut_points = [0] + cut_points + [None]  # to easy to for loop with first and last of list
+        self.ret_only = ret_only
+
+    def __call__(self, pred, target, **kwargs):
+        if self.ret_only is not None:
+            metric = self.metric_fns[self.ret_only]
+            s, e = self.cut_points[self.ret_only], self.cut_points[self.ret_only + 1]
+            val = metric(pred[:, s:e], target[:, s:e])
+            return val
+
+        each_metric = []
+        for i in range(len(self.metric_fns)):
+            s, e = self.cut_points[i], self.cut_points[i + 1]
+            print('test', s, e)
+            print('val', pred[:, s:e], target[:, s:e])
+            val = self.metric_fns[i](pred[:, s:e], target[:, s:e])
+            each_metric.append(val)
+
+        metrics = torch.stack(each_metric, dim=0)
+        return metrics
+
+
 def prob_weights_acc(pred, target, **kwargs):
     """
     Use together with `prlab.model.pyramid_sr.prob_weights_loss`
@@ -199,6 +236,8 @@ class WeightsAcc:
 def mae(pred, target, **kwargs):
     return torch.abs(target - pred).mean()
 
+
+# ====================== END OF METRICS ========================
 
 def make_theta_from_st(st, is_inverse=False):
     """
