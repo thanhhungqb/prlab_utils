@@ -7,6 +7,13 @@ import torch.nn.functional as F
 from prlab.common.utils import load_func_by_name, convert_to_obj_or_fn
 
 
+def cat_fixed(args):
+    """ fix torch.cat when ele is zero-dimensional tensor """
+    if len(args) > 0 and len(args[0].size()) == 0:
+        args = [o.view(-1) for o in args]
+    return torch.cat(args)
+
+
 class PassThrough(nn.Module):
     """
     Do nothing, just passthrough input
