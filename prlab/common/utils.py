@@ -159,6 +159,14 @@ def convert_to_fn(val, **kwargs):
     return val
 
 
+def get_name(o):
+    """ get name of object/class/function """
+    try:
+        return o.__name__
+    except:
+        return str(o)
+
+
 def constant_map_dict(dic, cons=None, excluded=None):
     """
     To mapping contants values and reused in JSON file (SELF CONSTANTS MAP).
