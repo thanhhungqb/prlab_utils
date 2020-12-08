@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 
-from prlab.common.utils import lazy_object_fn_call, convert_to_obj_or_fn
+from prlab.common.utils import lazy_object_fn_call, convert_to_obj_or_fn, get_name
 
 
 class DNNEncoder(nn.Module):
@@ -309,6 +309,7 @@ class MultiTaskVAEMetric(nn.Module):
 
         # support lazy calc to make object if not yet for all loss
         self.metrics = [convert_to_obj_or_fn(o, **kwargs) for o in metrics]
+        self.__name__ = f"M({','.join([get_name(o) for o in self.metrics])})"
 
     def forward(self, pred, target, **kwargs):
         _, _, _, second, *_ = pred
