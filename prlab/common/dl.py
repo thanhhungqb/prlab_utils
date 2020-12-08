@@ -3,7 +3,7 @@ import math
 from pathlib import Path
 
 from prlab.common.logger import PrettyLineHandler, WandbHandler
-from prlab.common.utils import make_check_point_folder, convert_to_obj_or_fn
+from prlab.common.utils import make_check_point_folder, convert_to_obj_or_fn, get_name
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +75,7 @@ def general_dl_make_up(**config):
         'loss_func': convert_to_obj_or_fn(loss_func, **config),
         'cp': cp,
     })
+    config['metric_names'] = [get_name(o) for o in config['metrics']]
 
     return config
 
