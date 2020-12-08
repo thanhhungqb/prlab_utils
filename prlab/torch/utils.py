@@ -7,7 +7,7 @@ import pandas as pd
 import torch
 
 from prlab.common.utils import convert_to_obj_or_fn, to_json_writeable
-from prlab.torch.functions import cat_fixed
+from prlab.torch.functions import cat_rec
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler())
@@ -183,22 +183,14 @@ def one_epoch(model, loss_func, opt_func, data_loader=None, test_mode=False, **c
 
             running_loss += loss.item()
             n_count += 1
-            predictions_corr += predictions
-            labels_corr += targets
+            predictions_corr.append(predictions)
+            labels_corr.append(targets)
 
     loss_val = running_loss / n_count
-    if isinstance(predictions_corr[0], list):
-        predictions_corr = list(zip(*predictions_corr))
-        predictions_corr = [cat_fixed(o) for o in predictions_corr]
-    else:
-        predictions_corr = cat_fixed(predictions_corr)
 
-    if isinstance(labels_corr, list):
-        labels_corr = list(zip(*labels_corr))
-        labels_corr = [cat_fixed(o) for o in labels_corr]
-    else:
-        labels_corr = cat_fixed(labels_corr)
-        
+    predictions_corr = cat_rec(predictions_corr)
+    labels_corr = cat_rec(labels_corr)
+
     metric_scores = process_metrics(preds_tensor=predictions_corr, targets_tensor=labels_corr, **config)
     return loss_val, metric_scores
 
