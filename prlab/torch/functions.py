@@ -14,6 +14,23 @@ def cat_fixed(args):
     return torch.cat(args)
 
 
+def cat_rec(args):
+    """
+    extend torch.cat that args should be tensor, list of tensor or list of list of tensor (rec)
+    :param args: tensor, list of tensor or rec list of tensor. Should be same size to cat
+    :return: tensor or list of tensor (rec) same structure as input
+    """
+    if isinstance(args, torch.Tensor):
+        return cat_fixed(args)
+    # list
+    if isinstance(args[0], torch.Tensor):
+        return cat_fixed(args)
+    # list of list then do cat in each column separated and return same structure
+    arrs = list(zip(*args))
+    ret = [cat_rec(o) for o in arrs]
+    return ret
+
+
 class PassThrough(nn.Module):
     """
     Do nothing, just passthrough input
