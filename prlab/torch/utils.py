@@ -22,7 +22,7 @@ def train_control(**config):
     train_logger.info("** start training ...")
     train_logger.info(f"number of trainable parameters {count_parameters(config['model'])}")
 
-    metric_names = [f'n_{i}' for i in range(5)]
+    metric_names = config.get('metric_names', [f'n_{i}' for i in range(5)])
 
     val_best_loss = None
 
@@ -67,7 +67,7 @@ def eval_control(**config):
     progress_logger = config.get('progress_logger', train_logger)
     train_logger.info("** start testing ...")
 
-    metric_names = [f'n_{i}' for i in range(5)]
+    metric_names = config.get('metric_names', [f'n_{i}' for i in range(5)])
 
     start_time = time.time()
 
