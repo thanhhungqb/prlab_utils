@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from prlab.common.utils import load_func_by_name, convert_to_obj_or_fn
+from prlab.common.utils import load_func_by_name, convert_to_obj_or_fn, get_name
 
 
 def cat_fixed(args):
@@ -159,6 +159,11 @@ class CompoundMetric:
         self.metric_fns = [convert_to_obj_or_fn(o) for o in metric_fns]
         self.cut_points = [0] + cut_points + [None]  # to easy to for loop with first and last of list
         self.ret_only = ret_only
+
+        if ret_only is not None: self.__name__ = get_name(self.metric_fns[ret_only])
+
+    def __repr__(self):
+        return f"CompoundMetric ({[get_name(o) for o in self.metric_fns]})"
 
     def __call__(self, pred, target, **kwargs):
         if self.ret_only is not None:
