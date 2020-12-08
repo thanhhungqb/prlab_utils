@@ -285,7 +285,41 @@ class MultiTaskVAELoss(nn.Module):
         out_loss = torch.stack(out_loss)
         b_loss = torch.sum(out_loss, dim=-1)
 
-        return torch.mean(b_loss)
+        # kl divergence loss
+        kl_loss = 0.5 * torch.sum(torch.exp(z_var) + z_mu ** 2 - 1.0 - z_var)
+
+        return torch.mean(b_loss) + kl_loss.mean() * self.lw[0]()
 
     def __repr__(self):
         return f"MultiTaskVAELoss ( {[str(o) for o in self.cat_loss]} )"
+
+
+class MultiTaskVAEMetric(nn.Module):
+    """
+    This class work together with MultiDecoderVAE,
+    the number of metric function should be equals to len(second_decoder)
+    Only using second output form [..] and target, tensor or [tensor]
+    """
+
+    def __init__(self, metrics=[], **kwargs):
+        """
+        :param metrics: list of metric
+        """
+        super(MultiTaskVAEMetric, self).__init__()
+
+        # support lazy calc to make object if not yet for all loss
+        self.metrics = [convert_to_obj_or_fn(o, **kwargs) for o in metrics]
+
+    def forward(self, pred, target, **kwargs):
+        _, _, _, second, *_ = pred
+        x_pred = second
+        target = target if len(x_pred) > 1 else [target]
+
+        out_metrics = [metric(p, t) for metric, p, t in zip(self.metrics, x_pred, target)]
+
+        out_metrics = torch.stack(out_metrics)
+
+        return out_metrics
+
+    def __repr__(self):
+        return f"MultiTaskVAEMetric ( {[str(o) for o in self.metrics]} )"
