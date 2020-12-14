@@ -266,6 +266,13 @@ def mae(pred, target, **kwargs):
     return torch.abs(target - pred).mean()
 
 
+def concordance_index(pred, target, event_observed=None, **kwargs):
+    from lifelines.utils import concordance_index
+    ret = concordance_index(target.detach().cpu(), pred.detach().cpu(), event_observed=event_observed)
+    ret = torch.tensor(ret)
+    return ret
+
+
 # ====================== END OF METRICS ========================
 
 def make_theta_from_st(st, is_inverse=False):
