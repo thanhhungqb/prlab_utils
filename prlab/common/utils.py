@@ -204,6 +204,8 @@ def to_json_writeable(js):
         return js
     if isinstance(js, str):
         return js
+    if isinstance(js, (range, set)):
+        return list(js)
     if isinstance(js, (tuple, list)):
         return [to_json_writeable(o) for o in js]
     if isinstance(js, dict):
