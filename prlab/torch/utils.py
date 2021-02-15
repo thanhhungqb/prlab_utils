@@ -108,7 +108,7 @@ def predict_control(**config):
     with torch.no_grad():
         for idx, (i_features, i_targets) in enumerate(data_loader):
             features, targets = process_input(i_features=i_features, i_targets=i_targets, **config)
-            predictions = model.predict(features) if hasattr(model, 'predict') else model(features)
+            predictions = model.predict(features, **config) if hasattr(model, 'predict') else model(features, **config)
             post_pred = predict_fn(predictions, **config)
 
             out = out + post_pred
