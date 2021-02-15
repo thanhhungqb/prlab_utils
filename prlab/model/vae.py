@@ -244,6 +244,24 @@ class MultiDecoderVAE(GeneralVAE):
         predicted = self.decoder(x_sample)
         return predicted
 
+    def predict(self, *x, **kwargs):
+        """
+        Get only the final result, omit other parts.
+        Also support by some framework
+        :param x:
+        :param kwargs:
+        :return:
+        """
+        store_output_mode = self.output_mode
+        self.output_mode = self.TEST_MODE
+
+        # run with test mode
+        _, second_output = self.forward(*x, **kwargs)
+
+        # restore for output_mode
+        self.output_mode = store_output_mode
+        return second_output
+
 
 class MultiTaskVAELoss(nn.Module):
     """
