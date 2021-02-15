@@ -256,7 +256,20 @@ class MultiDecoderVAE(GeneralVAE):
         self.output_mode = self.TEST_MODE
 
         # run with test mode
-        _, second_output = self.forward(*x, **kwargs)
+        if kwargs.get('TTA') is None:
+            _, second_output = self.forward(*x, **kwargs)
+        else:
+            tmp = []
+            for _ in range(int(kwargs['TTA'])):
+                _, second_output = self.forward(*x, **kwargs)
+                tmp.append(second_output)
+            tmp = list(zip(*tmp))
+
+            def fn(ttas):
+                s = torch.stack(ttas, dim=-1)  # TTA element [bs, ..., tta]
+                return torch.mean(s, dim=-1)
+
+            second_output = [fn(o) for o in tmp]
 
         # restore for output_mode
         self.output_mode = store_output_mode
