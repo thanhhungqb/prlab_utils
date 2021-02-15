@@ -100,19 +100,38 @@ def predict_control(**config):
     data_loader = config['data_test']
     model = config['model']
 
+    predict_fn = config.get('predict_post_process_fn', default_post_process_fn)
+    predict_fn = convert_to_obj_or_fn(predict_fn, **config)  # support lazy function
+
     out = []
     model.eval()
     with torch.no_grad():
         for idx, (i_features, i_targets) in enumerate(data_loader):
             features, targets = process_input(i_features=i_features, i_targets=i_targets, **config)
-            predictions = model(features)
-            predictions = torch.squeeze(predictions, -1)
-            out = out + predictions.cpu().detach().numpy().tolist()
+            predictions = model.predict(features) if hasattr(model, 'predict') else model(features)
+            post_pred = predict_fn(predictions, **config)
 
-    config['out'] = pd.DataFrame({'pid': config['test_df']['pid'], 'predict': out})
+            out = out + post_pred
+
+    ret_df = pd.DataFrame(out) if isinstance(out[0], dict) else pd.DataFrame({'predict': out})
+    ret_df['pid'] = config['test_df']['pid']
+    config['out'] = ret_df
 
     train_logger.info(f"** predict done in {time.time() - start_time}s!")
     return config
+
+
+def default_post_process_fn(x, **kw):
+    """
+    received a return from batch mode, convert to values to store
+    support single value, pairs, list of values for one row in it
+    also support each row is a dict (to make dataframe)
+
+    :param x:
+    :param kw:
+    :return:
+    """
+    return x.cpu().detach().numpy().tolist()
 
 
 def process_input(i_features, i_targets, device='cuda', **config):
