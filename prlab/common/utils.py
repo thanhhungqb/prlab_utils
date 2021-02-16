@@ -1085,6 +1085,24 @@ class PipeObjectMake:
         return f"PipeObjectMake ( {str(self.fn)} )"
 
 
+class PipeRunCommands:
+    """
+    Pipe that can run list of command
+    args and config are provided
+    """
+
+    def __init__(self, cmd, **config):
+        self.cmds = cmd if isinstance(cmd, list) else [cmd]
+
+    def __call__(self, *args, **config):
+        for command in self.cmds:
+            exec(command)
+        return config
+
+    def __repr__(self):
+        return f"PipeRunCommands ( {str(self.cmds)} )"
+
+
 def get_pipes(base_name, n_max=1000, **config):
     """
     get all pipes and flatten to one list. Pipe in form {base_name}-{i} with i<n_max
