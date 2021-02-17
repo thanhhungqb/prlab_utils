@@ -1129,6 +1129,13 @@ def get_pipes(base_name, n_max=1000, **config):
     return pipes
 
 
+def write_config_json(**config):
+    json_name = config.get('json_name', 'configure.json')
+    with open(config['cp'] / json_name, 'w') as fw:
+        json.dump(to_json_writeable(config), fw, indent=2)
+    return config
+
+
 # ============================ END OF PIPE =================================
 
 # some normalization function
