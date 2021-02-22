@@ -300,10 +300,15 @@ class MultiTaskVAELoss(nn.Module):
 
         self.cat_loss = [self.loss] + self.second_loss
 
+        def idfn(o):
+            def _fn():
+                return o
+            return _fn
+
         # loss weights
         lw = [convert_to_obj_or_fn(o) for o in lw]
         lw = lw + [1] * (1 + len(second_loss) - len(lw))  # padding 1 at the end if needed
-        self.lw = [o if callable(o) else (lambda: o) for o in lw]
+        self.lw = [o if callable(o) else idfn(o) for o in lw]
 
     def forward(self, pred, target, **kwargs):
         # using vae_pred, second and maybe x_p
@@ -319,7 +324,7 @@ class MultiTaskVAELoss(nn.Module):
         # kl divergence loss
         kl_loss = 0.5 * torch.sum(torch.exp(z_var) + z_mu ** 2 - 1.0 - z_var)
 
-        return torch.mean(b_loss) + kl_loss.mean() * self.lw[0]()
+        return torch.mean(b_loss) + kl_loss.mean() * self.lw[0]() / len(self.cat_loss)
 
     def __repr__(self):
         return f"MultiTaskVAELoss ( {[str(o) for o in self.cat_loss]} )"
