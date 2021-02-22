@@ -122,7 +122,7 @@ class DNNDecoder(nn.Module):
         self.hiddens = nn.Sequential(*self.seqs)
 
         self.output_layer = nn.Linear(self.hidden_dim[-1], self.output_dim)
-        self.last = nn.Sigmoid() if kwargs.get('is_sigmoid_last', True) else None
+        self.last = nn.Sigmoid() if kwargs.get('is_sigmoid_last', False) else None
 
     def forward(self, x, **kwargs):
         hidden_val = self.hiddens(x)
@@ -303,6 +303,7 @@ class MultiTaskVAELoss(nn.Module):
         def idfn(o):
             def _fn():
                 return o
+
             return _fn
 
         # loss weights
@@ -324,7 +325,8 @@ class MultiTaskVAELoss(nn.Module):
         # kl divergence loss
         kl_loss = 0.5 * torch.sum(torch.exp(z_var) + z_mu ** 2 - 1.0 - z_var)
 
-        return torch.mean(b_loss) + kl_loss.mean() * self.lw[0]() / len(self.cat_loss)
+        final_loss = torch.mean(b_loss) + kl_loss.mean() * self.lw[0]() / len(self.cat_loss)
+        return final_loss
 
     def __repr__(self):
         return f"MultiTaskVAELoss ( {[str(o) for o in self.cat_loss]} )"
