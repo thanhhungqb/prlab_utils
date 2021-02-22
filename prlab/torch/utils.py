@@ -35,6 +35,7 @@ def train_control(**config):
 
         if val_best_loss is None or val_loss < val_best_loss:
             # TODO best valid callback
+            train_logger.info(f"better on validation at {epoch}")
             val_best_loss, val_best_score = val_loss, val_score
             torch.save(config['model'].state_dict(), config['cp'] / 'best.w')
 
