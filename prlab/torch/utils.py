@@ -7,6 +7,7 @@ import pandas as pd
 import torch
 
 from prlab.common.utils import convert_to_obj_or_fn, to_json_writeable
+from prlab.torch.functions import cat_rec
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler())
@@ -21,7 +22,7 @@ def train_control(**config):
     train_logger.info("** start training ...")
     train_logger.info(f"number of trainable parameters {count_parameters(config['model'])}")
 
-    metric_names = [f'n_{i}' for i in range(5)]
+    metric_names = config.get('metric_names', [f'n_{i}' for i in range(5)])
 
     val_best_loss = None
 
@@ -34,6 +35,7 @@ def train_control(**config):
 
         if val_best_loss is None or val_loss < val_best_loss:
             # TODO best valid callback
+            train_logger.info(f"better on validation at {epoch}")
             val_best_loss, val_best_score = val_loss, val_score
             torch.save(config['model'].state_dict(), config['cp'] / 'best.w')
 
@@ -66,7 +68,7 @@ def eval_control(**config):
     progress_logger = config.get('progress_logger', train_logger)
     train_logger.info("** start testing ...")
 
-    metric_names = [f'n_{i}' for i in range(5)]
+    metric_names = config.get('metric_names', [f'n_{i}' for i in range(5)])
 
     start_time = time.time()
 
@@ -99,19 +101,38 @@ def predict_control(**config):
     data_loader = config['data_test']
     model = config['model']
 
+    predict_fn = config.get('predict_post_process_fn', default_post_process_fn)
+    predict_fn = convert_to_obj_or_fn(predict_fn, **config)  # support lazy function
+
     out = []
     model.eval()
     with torch.no_grad():
         for idx, (i_features, i_targets) in enumerate(data_loader):
             features, targets = process_input(i_features=i_features, i_targets=i_targets, **config)
-            predictions = model(features)
-            predictions = torch.squeeze(predictions, -1)
-            out = out + predictions.cpu().detach().numpy().tolist()
+            predictions = model.predict(features, **config) if hasattr(model, 'predict') else model(features, **config)
+            post_pred = predict_fn(predictions, **config)
 
-    config['out'] = pd.DataFrame({'pid': config['test_df']['pid'], 'predict': out})
+            out = out + post_pred
+
+    ret_df = pd.DataFrame(out) if isinstance(out[0], dict) else pd.DataFrame({'predict': out})
+    ret_df['pid'] = config['test_df']['pid']
+    config['out'] = ret_df
 
     train_logger.info(f"** predict done in {time.time() - start_time}s!")
     return config
+
+
+def default_post_process_fn(x, **kw):
+    """
+    received a return from batch mode, convert to values to store
+    support single value, pairs, list of values for one row in it
+    also support each row is a dict (to make dataframe)
+
+    :param x:
+    :param kw:
+    :return:
+    """
+    return x.cpu().detach().numpy().tolist()
 
 
 def process_input(i_features, i_targets, device='cuda', **config):
@@ -175,7 +196,6 @@ def one_epoch(model, loss_func, opt_func, data_loader=None, test_mode=False, **c
 
             features, targets = process_input(i_features=i_features, i_targets=i_targets, **config)
             predictions = model(features)
-            predictions = torch.squeeze(predictions, -1)
 
             loss = loss_func(predictions, targets)
 
@@ -183,11 +203,14 @@ def one_epoch(model, loss_func, opt_func, data_loader=None, test_mode=False, **c
 
             running_loss += loss.item()
             n_count += 1
-            predictions_corr += predictions
-            labels_corr += targets
+            predictions_corr.append(predictions)
+            labels_corr.append(targets)
 
     loss_val = running_loss / n_count
-    predictions_corr, labels_corr = torch.stack(predictions_corr), torch.stack(labels_corr)
+
+    predictions_corr = cat_rec(predictions_corr)
+    labels_corr = cat_rec(labels_corr)
+
     metric_scores = process_metrics(preds_tensor=predictions_corr, targets_tensor=labels_corr, **config)
     return loss_val, metric_scores
 
@@ -210,3 +233,7 @@ def seed_set(**config):
         torch.manual_seed(seed)
         np.random.seed(seed)
     return config
+
+
+def cumsum_rev(x):
+    return torch.flip(torch.cumsum(torch.flip(x, [1]), 1), [1])
