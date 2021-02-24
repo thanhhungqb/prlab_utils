@@ -4,7 +4,31 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from prlab.common.utils import load_func_by_name, convert_to_obj_or_fn
+from prlab.common.utils import load_func_by_name, convert_to_obj_or_fn, get_name
+
+
+def cat_fixed(args):
+    """ fix torch.cat when ele is zero-dimensional tensor """
+    if len(args) > 0 and len(args[0].size()) == 0:
+        args = [o.view(-1) for o in args]
+    return torch.cat(args)
+
+
+def cat_rec(args):
+    """
+    extend torch.cat that args should be tensor, list of tensor or list of list of tensor (rec)
+    :param args: tensor, list of tensor or rec list of tensor. Should be same size to cat
+    :return: tensor or list of tensor (rec) same structure as input
+    """
+    if isinstance(args, torch.Tensor):
+        return cat_fixed(args)
+    # list
+    if isinstance(args[0], torch.Tensor):
+        return cat_fixed(args)
+    # list of list then do cat in each column separated and return same structure
+    arrs = list(zip(*args))
+    ret = [cat_rec(o) for o in arrs]
+    return ret
 
 
 class PassThrough(nn.Module):
@@ -118,6 +142,48 @@ def weights_branches(pred, **kwargs):
     return c_out
 
 
+# ====================== METRICS ========================
+class CompoundMetric:
+    """
+    one or more loss function in single tensor. e.g. [bs, 5] with reg in [bs, 0:1] and cls in [bs, 1:]
+    """
+
+    def __init__(self, metric_fns, cut_points, ret_only=None, **kwargs):
+        """
+        :param metric_fns: metric function/class callable
+        :param cut_points: cut_point in second of input [bs, ?, ...], len(cut_point) = len(metric_fns)-1
+        :param ret_only: int or None, what metric (only one) should be return, None if return all
+        """
+        super().__init__()
+        assert len(metric_fns) - 1 == len(cut_points)
+        self.metric_fns = [convert_to_obj_or_fn(o) for o in metric_fns]
+        self.cut_points = [0] + cut_points + [None]  # to easy to for loop with first and last of list
+        self.ret_only = ret_only
+
+        if ret_only is not None: self.__name__ = get_name(self.metric_fns[ret_only])
+
+    def __repr__(self):
+        return f"CompoundMetric ({[get_name(o) for o in self.metric_fns]})"
+
+    def __call__(self, pred, target, **kwargs):
+        if self.ret_only is not None:
+            metric = self.metric_fns[self.ret_only]
+            s, e = self.cut_points[self.ret_only], self.cut_points[self.ret_only + 1]
+            val = metric(pred[:, s:e], target[:, s:e])
+            return val
+
+        each_metric = []
+        for i in range(len(self.metric_fns)):
+            s, e = self.cut_points[i], self.cut_points[i + 1]
+            print('test', s, e)
+            print('val', pred[:, s:e], target[:, s:e])
+            val = self.metric_fns[i](pred[:, s:e], target[:, s:e])
+            each_metric.append(val)
+
+        metrics = torch.stack(each_metric, dim=0)
+        return metrics
+
+
 def prob_weights_acc(pred, target, **kwargs):
     """
     Use together with `prlab.model.pyramid_sr.prob_weights_loss`
@@ -199,6 +265,15 @@ class WeightsAcc:
 def mae(pred, target, **kwargs):
     return torch.abs(target - pred).mean()
 
+
+def concordance_index(pred, target, event_observed=None, **kwargs):
+    from lifelines.utils import concordance_index
+    ret = concordance_index(target.detach().cpu(), pred.detach().cpu(), event_observed=event_observed)
+    ret = torch.tensor(ret)
+    return ret
+
+
+# ====================== END OF METRICS ========================
 
 def make_theta_from_st(st, is_inverse=False):
     """

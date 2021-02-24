@@ -7,22 +7,20 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torchvision
-from fastai import callbacks
-from fastai.basic_data import DatasetType
-from fastai.basic_train import Learner
-from fastai.callback import Callback
-from fastai.callbacks import SaveModelCallback, CSVLogger
-from fastai.metrics import top_k_accuracy, accuracy, dice
-from fastai.torch_core import MetricsList
-from fastai.train import ClassificationInterpretation
-from fastai.vision import imagenet_stats, get_transforms, models, open_image
+from fastai.callback.core import Callback
+from fastai.callback.progress import CSVLogger
+from fastai.callback.tracker import SaveModelCallback
+from fastai.interpret import ClassificationInterpretation
+from fastai.learner import Learner
+from fastai.metrics import accuracy, top_k_accuracy
+from fastai.vision import models
+from fastai.vision.core import imagenet_stats
 from torch.autograd import Variable
 from torch.nn.functional import log_softmax
 
 from outside.scikit.plot_confusion_matrix import plot_confusion_matrix
 from prlab.common.dl import general_dl_make_up
-from prlab.common.utils import convert_to_obj_or_fn, load_func_by_name, lazy_object_fn_call
-from prlab.torch.functions import ExLoss, weights_branches
+from prlab.common.utils import lazy_object_fn_call
 
 
 def freeze_layer(x, flag=True):
@@ -159,7 +157,8 @@ class ECSVLogger(CSVLogger):
     def __init__(self, learn: Learner, filename: str = 'history', append: bool = False):
         super(ECSVLogger, self).__init__(learn, filename, append)
 
-    def on_epoch_end(self, epoch: int, smooth_loss: torch.Tensor, last_metrics: MetricsList, **kwargs: Any) -> bool:
+    def on_epoch_end(self, epoch: int, smooth_loss: torch.Tensor, last_metrics, **kwargs: Any) -> bool:
+        """ fastai v1, last_metrics: MetricsList"""
         super().on_epoch_end(epoch, smooth_loss, last_metrics, **kwargs)
         self.file.flush()  # to make sure write to disk
 
@@ -181,8 +180,9 @@ class DataArgCallBack(Callback):
         self.transform_size = transform_size
         self.normalize = normalize
 
-    def on_epoch_end(self, epoch: int, smooth_loss: torch.Tensor, last_metrics: MetricsList, **kwargs: Any) -> bool:
+    def on_epoch_end(self, epoch: int, smooth_loss: torch.Tensor, last_metrics, **kwargs: Any) -> bool:
         # do with data
+        """ fastai v1, last_metrics: MetricsList"""
         n_data = (self.src
                   .label_from_func(self.label_func)
                   .transform([[], []], size=self.transform_size)
@@ -204,20 +204,7 @@ def get_callbacks(best_name='best', monitor='valid_loss', csv_filename='log', cs
     return out
 
 
-# Loss functions/class
-def do_reduction(loss_tensor, reduction='mean'):
-    """
-    reduction that use in most loss function
-    :param loss_tensor:
-    :param reduction: str => none (None), mean, sum
-    :return: out with reduction
-    """
-    if isinstance(reduction, str) and hasattr(loss_tensor, reduction):
-        loss_tensor = getattr(loss_tensor, reduction)()
-    return loss_tensor
-
-
-def dificult_weight_loss(pred, target, *args, **kwargs):
+def difficult_weight_loss(pred, target, *args, **kwargs):
     """
     loss = - 1 * log(pi) * (pj/pi), where pj is max(p_)
     :param pred:
@@ -239,199 +226,7 @@ def dificult_weight_loss(pred, target, *args, **kwargs):
     return torch.mean(a)
 
 
-def prob_loss_raw(pred, target, **kwargs):
-    """
-    This is a custom of `torch.nn.CrossEntropyLoss`.
-    NOTE: this version is nearly KL-divergence than CrossEntropy implement in pytorch?
-    Loss when y input as raw probability instead a int number.
-    Use when prob not 1/0 but float distribution
-    :param pred: raw_scrore (not softmax)
-    :param target: [0.7 0.2 0.1]
-    :return:
-    """
-    # y = y[:, :7]
-    l_softmax = log_softmax(pred, 1)
-
-    a = -target * l_softmax
-    a = torch.sum(a, dim=1)
-
-    return a
-
-
-class ProbLoss(torch.nn.Module):
-    def __init__(self, reduction='mean', **kwargs):
-        super().__init__()
-        self.reduction = reduction
-
-    def forward(self, pred, target):
-        out = prob_loss_raw(pred=pred, target=target)
-        return do_reduction(out, reduction=self.reduction)
-
-
-class ProbLossRaw(ProbLoss):
-    def __init__(self, **kwargs):
-        kwargs['reduction'] = 'none'
-        super().__init__(**kwargs)
-
-
-def prob_loss(input, target, **kwargs):
-    return torch.mean(prob_loss_raw(input, target, **kwargs))
-
-
-class LabelSmoothingLoss(torch.nn.Module):
-    """
-    For Label Smoothing loss (not one-hot but softer) with alpha default 0.9.
-    Similar to `prlab.fastai.utils.LabelSmoothingLoss1` but fix the hs of 1-alpha part and safer i_mtx
-    pred: [bs, lbl_size], target: [bs]
-    """
-
-    def __init__(self, alpha=0.9, reduction='mean', **kwargs):
-        super().__init__()
-        self.alpha = alpha
-        self.reduction = reduction
-
-    def forward(self, pred, target):
-        lbl_size = pred.size()[-1]
-        i_mtx = torch.eye(lbl_size).to(target.device)
-        t = torch.embedding(i_mtx, target)
-        soft_part = torch.ones_like(t)
-        l_softmax = log_softmax(pred, 1)
-        out = -t * l_softmax * self.alpha - soft_part * l_softmax * (1 - self.alpha) / lbl_size
-        out = out.sum(dim=-1)
-
-        return do_reduction(out, reduction=self.reduction)
-
-
-class LabelSmoothingLoss1(torch.nn.Module):
-    """
-    For Label Smoothing loss (not one-hot but softer) with alpha default 0.9.
-    Similar to `torch.nn.CrossEntropyLoss` but now with softer
-    pred: [bs, lbl_size], target: [bs]
-    NOTE:   there is a risk when does not sum out before the reduction step.
-            the class mostly use with mean reduction, but if none given, then it will fail
-            we do not correct it, just use newer version `LabelSmoothingLoss`.
-            This class just keep for old reference.
-    """
-
-    def __init__(self, alpha=0.9, reduction='mean', **kwargs):
-        super().__init__()
-        self.alpha = alpha
-        self.reduction = reduction
-        self.emb = None
-
-    def forward(self, pred, target):
-        if self.emb is None:
-            self.emb = torch.eye(pred.size()[-1]).to(target.device)
-        t = torch.embedding(self.emb, target)
-        soft_part = torch.ones_like(t)
-        l_softmax = log_softmax(pred, 1)
-        out = -t * l_softmax * self.alpha - soft_part * l_softmax * (1 - self.alpha)
-
-        return do_reduction(out, reduction=self.reduction)
-
-
-SoftLoss = LabelSmoothingLoss1  # for old reference
-
-
-class LabelSmoothingLossDis(LabelSmoothingLoss):
-    """
-    Like `LabelSmoothingLoss`, but the given is distribution (by statistical)
-    pred: [bs, lbl_size], target: [bs, lbl_size]
-    """
-
-    def __init__(self, alpha=0.5, **kwargs):
-        super().__init__(alpha=alpha, **kwargs)
-
-    def forward(self, pred, target):
-        lbl_size = pred.size()[-1]
-        i_mtx = torch.eye(lbl_size).to(target.device)
-
-        with torch.no_grad():
-            lbl_correct = target.argmax(dim=-1)
-            one_hot = torch.embedding(i_mtx, lbl_correct)
-
-        l_softmax = log_softmax(pred, 1)
-        out = -(one_hot * self.alpha + target * (1 - self.alpha)) * l_softmax
-        out = out.sum(dim=-1)
-
-        return do_reduction(out, reduction=self.reduction)
-
-
-class LabelSmoothingLossDisRaw(LabelSmoothingLossDis):
-    def __init__(self, **kwargs):
-        kwargs['reduction'] = 'none'  # just set none to return raw
-        super().__init__(**kwargs)
-
-
-class DistCutOffLoss(torch.nn.Module):
-    """
-    Use cross entropy loss but with the prior distribution and cut off for correct label
-    ref to `torch.nn.CrossEntropyLoss`
-    input pred [n_label] x target [n_label] (target is not in one-hot, it in form of distribution)
-    lbl_correct = correct label = argmax(target)
-    if pred[lbl_correct] >= target[lbl_correct] => loss = 0
-    else: loss = cel(pred, target)
-    reduction most of time is mean, sometime none if use inside of another loss that need raw.
-    See `torch.nn.modules.loss._Loss`
-    """
-
-    def __init__(self, reduction='mean', part=2, **kwargs):
-        super().__init__()
-        self.reduction = reduction
-        self.part = part
-
-    def forward(self, pred, target):
-        # calc cross entropy in raw mode (return [bs])
-        out = prob_loss_raw(pred=pred, target=target)
-
-        # calc weight, 0 or 1 only, no grad
-        with torch.no_grad():
-            lbl_correct = target.argmax(dim=-1)
-            c_pred, c_target = pred[:, lbl_correct], target[:, lbl_correct]
-            zeros, ones = torch.zeros(1), torch.ones(1)
-            zeros, ones = zeros.to(target.device), ones.to(target.device)
-            one_part = ones / self.part
-            # [bs] which 0 or 1
-            weighted = torch.where(c_pred < c_target, ones, one_part)
-        out = out * weighted
-
-        return do_reduction(out, reduction=self.reduction)
-
-
-class DistCutOffLossRaw(DistCutOffLoss):
-    def __init__(self, **kwargs):
-        kwargs['reduction'] = 'none'  # just set none to return raw
-        super().__init__(**kwargs)
-
-
-class NormWeightsLoss(ExLoss):
-    """
-    Similar to `prlab.model.pyramid_sr.norm_weights_loss` but could configure the second loss func
-    Note that the second loss func/obj must in raw (not reduction)
-    """
-
-    def __init__(self, second_loss_fn=None, **kwargs):
-        print('run in NormWeightsLoss')
-        super().__init__()
-        self.f_loss = torch.nn.CrossEntropyLoss(reduction='none')  # default
-        # TODO fix if second_loss_fn not support kwargs
-        if second_loss_fn:
-            self.f_loss = convert_to_obj_or_fn(second_loss_fn, **kwargs)
-            print('use second loss', self.f_loss)
-
-    def forward(self, pred, target, **kwargs):
-        if not isinstance(pred, tuple):
-            return self.f_loss(pred, target)
-
-        out, _ = pred
-        n_branches = out.size()[-1]
-        losses = [self.f_loss(out[:, :, i], target) for i in range(n_branches)]
-
-        losses = torch.stack(losses, dim=-1)
-        # loss = (losses * weights).sum(dim=-1)
-
-        loss = torch.mean(losses, dim=-1)
-        return torch.mean(loss)
+dificult_weight_loss = difficult_weight_loss
 
 
 def prob_acc(pred, target, **kwargs):
@@ -447,24 +242,6 @@ def prob_acc(pred, target, **kwargs):
 
 def joint_acc(preds, target, **kwargs):
     return accuracy(preds[0], target)
-
-
-class NormWeightsAcc:
-    """
-    refer to `prlab.torch.functions.norm_weights_acc` but in class mode and could modified f_acc
-    """
-    __name__ = 'NormWeightsAcc'
-
-    def __init__(self, part=-1, **config):
-        second_metrics_fn = config.get('second_metrics_fn', 'fastai.metrics.accuracy')
-        self.part = part
-        self.f_acc, _ = load_func_by_name(second_metrics_fn)
-
-    def __call__(self, pred, target, *args, **kwargs):
-        c_out = weights_branches(pred=pred)
-        if self.part >= 0:
-            return self.f_acc(c_out[:, self.part], target[:, self.part])
-        return self.f_acc(c_out, target)
 
 
 def make_one_hot(labels, C=2):
@@ -684,6 +461,3 @@ top2_acc.__name__ = 'top2_accuracy'
 top3_acc.__name__ = 'top3_accuracy'
 top5_acc.__name__ = 'top5_accuracy'
 tmetrics = [accuracy, top2_acc, top3_acc]
-
-iou = partial(dice, iou=True)
-iou.__name__ = 'iou'

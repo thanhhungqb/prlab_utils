@@ -1,8 +1,9 @@
 import logging
+import math
 from pathlib import Path
 
 from prlab.common.logger import PrettyLineHandler, WandbHandler
-from prlab.common.utils import make_check_point_folder, convert_to_obj_or_fn
+from prlab.common.utils import make_check_point_folder, convert_to_obj_or_fn, get_name
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +47,7 @@ def pipeline_control_multi(**kwargs):
         process_pipeline = convert_to_obj_or_fn(config[pipe_name])
         for fn in process_pipeline:
             print(f'running {str(fn)} ...')
-            fn = convert_to_obj_or_fn(fn, lazy=True)
+            fn = convert_to_obj_or_fn(fn, lazy=True, **config)
             if callable(fn):
                 config = fn(**config)
             else:
@@ -74,6 +75,7 @@ def general_dl_make_up(**config):
         'loss_func': convert_to_obj_or_fn(loss_func, **config),
         'cp': cp,
     })
+    config['metric_names'] = [get_name(o) for o in config['metrics']]
 
     return config
 
@@ -92,8 +94,26 @@ def make_train_loggers(**config):
     logger_progress.setLevel(log_level)
     logger_progress.addHandler(PrettyLineHandler())
     logger_progress.addHandler(PrettyLineHandler(base_hdl=logging.FileHandler(config["cp"] / "progress.log")))
-    if config.get('wandb') is not None:
+    if config.get('wandb', False):
         logger_progress.addHandler(WandbHandler(**config))
 
     return {**config, 'train_logger': logger_general, 'progress_logger': logger_progress}
+
+
 # ========================  END OF GENERAL ========================
+
+
+class WeightByCall:
+    """
+    Make weight by the number of call (number of batch).
+    Usually to control of multi-branches of loss function. e.g. first 5 epoch with w=0.1, next it 1
+    """
+
+    def __init__(self, fn=math.tanh, n_batch=1, **kwargs):
+        self.call_count = 0
+        self.fn = convert_to_obj_or_fn(fn)
+        self.n_batch = n_batch
+
+    def __call__(self, *args, **kwargs):
+        self.call_count += 1
+        return self.fn(self.call_count / self.n_batch)

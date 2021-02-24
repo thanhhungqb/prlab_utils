@@ -159,6 +159,14 @@ def convert_to_fn(val, **kwargs):
     return val
 
 
+def get_name(o):
+    """ get name of object/class/function """
+    try:
+        return o.__name__
+    except:
+        return str(o)
+
+
 def constant_map_dict(dic, cons=None, excluded=None):
     """
     To mapping contants values and reused in JSON file (SELF CONSTANTS MAP).
@@ -196,6 +204,8 @@ def to_json_writeable(js):
         return js
     if isinstance(js, str):
         return js
+    if isinstance(js, (range, set)):
+        return list(js)
     if isinstance(js, (tuple, list)):
         return [to_json_writeable(o) for o in js]
     if isinstance(js, dict):
@@ -843,6 +853,57 @@ def merge_xlsx(files, merged_file=None):
     return merged_df
 
 
+class CategoricalEncoderPandas:
+    def __init__(self, cat_names, df=None, **config):
+        self.encoders = {cat: preprocessing.LabelEncoder() for cat in cat_names}
+        self.cat_names = cat_names
+        self.nan = '#NA#'
+        self.fit_df(df=df) if df is not None else None
+
+    def __getitem__(self, cat_name):
+        return self.encoders[cat_name]
+
+    def fit(self, cat_name, values, **config):
+        # add #NA# to index 0
+        return self.encoders[cat_name].fit(list(values) + [self.nan])
+
+    def fit_df(self, df, **config):
+        """" fit whole dataframe, but only get categorical columns """
+        for cat_name in self.cat_names:
+            self.fit(cat_name=cat_name, values=df[cat_name])
+
+    def transform(self, cat_name, values=[], **config):
+        # if value is not in ... then return #NA#
+        ret = []
+        encoder = self.encoders[cat_name]
+        for value in values:
+            try:
+                ret.append(encoder.transform([value]))
+            except:
+                ret.append(encoder.transform([self.nan]))
+        return ret
+
+    def inverse_transform(self, cat_name, values=[], **config):
+        ret = []
+        encoder = self.encoders[cat_name]
+        for value in values:
+            try:
+                ret.append(encoder.inverse_transform([value]))
+            except:
+                ret.append(encoder.inverse_transform([self.nan]))
+        return ret
+
+    def get_class(self, cat_name, **config):
+        return self.encoders[cat_name].classes_
+
+    def get_size(self):
+        return [len(self.encoders[cat_name].classes_) for cat_name in self.cat_names]
+
+    def __repr__(self):
+        d = {k: v.classes_ for k, v in self.encoders.items()}
+        return f"CategoricalEncoderPandas: {str(d)}"
+
+
 def train_test_split_fold(**config):
     """
     Split train/test/valid? by fold mode
@@ -961,9 +1022,25 @@ class PipeClassWrap:
         return self.fn(*args, **params)
 
 
+def params_mapping(params, map_param_name={}, fixed_params=None, **config):
+    """
+    Param mapping/reorder to pass, usually using with named params
+    :param params: current params, may be override config, but map should override it {name:value}
+    :param map_param_name: highest priority params, mapping from config with new name {new_name:old_name_in_config}
+    :param fixed_params: [name], name of fixed params to pass, all others will be omitted
+    :param config: other params, lowest priority
+    :return:
+    """
+    new_params = {k: config.get(v) for k, v in map_param_name.items()}
+    to_pass = {**config, **params, **new_params}
+    if fixed_params is not None:
+        to_pass = {k: v for k, v in to_pass.items() if k in fixed_params}
+    return to_pass
+
+
 class PipeClassCallWrap:
     """
-    Wrap a function call with return to a pipe call with update configure
+    Wrap a function/object call with return to a pipe call with update configure
     """
 
     def __init__(self, fn, ret_name='out', params=None, map_name=None, fixed_params=None, **config):
@@ -975,15 +1052,55 @@ class PipeClassCallWrap:
         self.fixed_params = fixed_params  # support for class/func that has fixed number params (does not allow **kw)
 
     def __call__(self, *args, **config):
-        new_params = {k: config.get(v) for k, v in self.map_param_name.items()}
-        to_pass = {**config, **self.params, **new_params}
-        if self.fixed_params is not None:
-            to_pass = {k: v for k, v in to_pass.items() if k in self.fixed_params}
+        to_pass = params_mapping(params=self.params, map_param_name=self.map_param_name,
+                                 fixed_params=self.fixed_params, **config)
         config[self.ret_name] = self.fn(*args, **to_pass)
         return config
 
     def __repr__(self):
         return f"PipeClassCallWrap ( {str(self.fn)} )"
+
+
+class PipeObjectMake:
+    """
+    Just make object from information and store to config, similar with PipeClassCallWrap but does not eval fn at the
+    make time.
+    Just using for object make, do not use with function
+    """
+
+    def __init__(self, fn, ret_name='out', params=None, map_name=None, fixed_params=None, **config):
+        self.fn = fn
+        self.ret_name = ret_name
+        self.params = params if params is not None else {}
+        self.map_param_name = {} if map_name is None else map_name
+        self.fixed_params = fixed_params  # support for class/func that has fixed number params (does not allow **kw)
+
+    def __call__(self, *args, **config):
+        to_pass = params_mapping(params=self.params, map_param_name=self.map_param_name,
+                                 fixed_params=self.fixed_params, **config)
+        config[self.ret_name] = convert_to_obj_or_fn(self.fn, lazy=True, *args, **to_pass)
+        return config
+
+    def __repr__(self):
+        return f"PipeObjectMake ( {str(self.fn)} )"
+
+
+class PipeRunCommands:
+    """
+    Pipe that can run list of command
+    args and config are provided
+    """
+
+    def __init__(self, cmd, **config):
+        self.cmds = cmd if isinstance(cmd, list) else [cmd]
+
+    def __call__(self, *args, **config):
+        for command in self.cmds:
+            exec(command)
+        return config
+
+    def __repr__(self):
+        return f"PipeRunCommands ( {str(self.cmds)} )"
 
 
 def get_pipes(base_name, n_max=1000, **config):
@@ -1010,6 +1127,13 @@ def get_pipes(base_name, n_max=1000, **config):
         pipes = [base_name]
 
     return pipes
+
+
+def write_config_json(**config):
+    json_name = config.get('json_name', 'configure.json')
+    with open(config['cp'] / json_name, 'w') as fw:
+        json.dump(to_json_writeable(config), fw, indent=2)
+    return config
 
 
 # ============================ END OF PIPE =================================
