@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 def simple_model(**config):
-    config['model'] = convert_to_obj_or_fn(config['model']).to(config.get('device', 'cuda'))
+    config['model'] = convert_to_obj_or_fn(config['model'], **config).to(config.get('device', 'cuda'))
     return config
 
 

@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 
-from prlab.common.utils import lazy_object_fn_call, convert_to_obj_or_fn
+from prlab.common.utils import lazy_object_fn_call, convert_to_obj_or_fn, get_name
 
 
 class DNNEncoder(nn.Module):
@@ -122,7 +122,7 @@ class DNNDecoder(nn.Module):
         self.hiddens = nn.Sequential(*self.seqs)
 
         self.output_layer = nn.Linear(self.hidden_dim[-1], self.output_dim)
-        self.last = nn.Sigmoid() if kwargs.get('is_sigmoid_last', True) else None
+        self.last = nn.Sigmoid() if kwargs.get('is_sigmoid_last', False) else None
 
     def forward(self, x, **kwargs):
         hidden_val = self.hiddens(x)
@@ -244,6 +244,37 @@ class MultiDecoderVAE(GeneralVAE):
         predicted = self.decoder(x_sample)
         return predicted
 
+    def predict(self, *x, **kwargs):
+        """
+        Get only the final result, omit other parts.
+        Also support by some framework
+        :param x:
+        :param kwargs:
+        :return:
+        """
+        store_output_mode = self.output_mode
+        self.output_mode = self.TEST_MODE
+
+        # run with test mode
+        if kwargs.get('TTA') is None:
+            _, second_output = self.forward(*x, **kwargs)
+        else:
+            tmp = []
+            for _ in range(int(kwargs['TTA'])):
+                _, second_output = self.forward(*x, **kwargs)
+                tmp.append(second_output)
+            tmp = list(zip(*tmp))
+
+            def fn(ttas):
+                s = torch.stack(ttas, dim=-1)  # TTA element [bs, ..., tta]
+                return torch.mean(s, dim=-1)
+
+            second_output = [fn(o) for o in tmp]
+
+        # restore for output_mode
+        self.output_mode = store_output_mode
+        return second_output
+
 
 class MultiTaskVAELoss(nn.Module):
     """
@@ -269,23 +300,65 @@ class MultiTaskVAELoss(nn.Module):
 
         self.cat_loss = [self.loss] + self.second_loss
 
+        def idfn(o):
+            def _fn():
+                return o
+
+            return _fn
+
         # loss weights
-        if len(lw) == 0: lw = [1] * (1 + len(second_loss))
-        assert len(lw) == 1 + len(second_loss)
-        self.lw = [o if callable(o) else (lambda: o) for o in lw]
+        lw = [convert_to_obj_or_fn(o) for o in lw]
+        lw = lw + [1] * (1 + len(second_loss) - len(lw))  # padding 1 at the end if needed
+        self.lw = [o if callable(o) else idfn(o) for o in lw]
 
     def forward(self, pred, target, **kwargs):
         # using vae_pred, second and maybe x_p
         vae_pred, z_mu, z_var, second, x_p, *_ = pred
         x_pred = [vae_pred, *second]
-        x_target = [x_p, *target]
+        x_target = [x_p, *target] if len(second) > 1 else [x_p, target]
 
         out_loss = [fw() * floss(p, t) for floss, p, t, fw in zip(self.cat_loss, x_pred, x_target, self.lw)]
 
         out_loss = torch.stack(out_loss)
         b_loss = torch.sum(out_loss, dim=-1)
 
-        return torch.mean(b_loss)
+        # kl divergence loss
+        kl_loss = 0.5 * torch.sum(torch.exp(z_var) + z_mu ** 2 - 1.0 - z_var)
+
+        final_loss = torch.mean(b_loss) + kl_loss.mean() * self.lw[0]() / len(self.cat_loss)
+        return final_loss
 
     def __repr__(self):
         return f"MultiTaskVAELoss ( {[str(o) for o in self.cat_loss]} )"
+
+
+class MultiTaskVAEMetric(nn.Module):
+    """
+    This class work together with MultiDecoderVAE,
+    the number of metric function should be equals to len(second_decoder)
+    Only using second output form [..] and target, tensor or [tensor]
+    """
+
+    def __init__(self, metrics=[], **kwargs):
+        """
+        :param metrics: list of metric
+        """
+        super(MultiTaskVAEMetric, self).__init__()
+
+        # support lazy calc to make object if not yet for all loss
+        self.metrics = [convert_to_obj_or_fn(o, **kwargs) for o in metrics]
+        self.__name__ = f"M({','.join([get_name(o) for o in self.metrics])})"
+
+    def forward(self, pred, target, **kwargs):
+        _, _, _, second, *_ = pred
+        x_pred = second
+        target = target if len(x_pred) > 1 else [target]
+
+        out_metrics = [metric(p, t) for metric, p, t in zip(self.metrics, x_pred, target)]
+
+        out_metrics = torch.stack(out_metrics)
+
+        return out_metrics
+
+    def __repr__(self):
+        return f"MultiTaskVAEMetric ( {[str(o) for o in self.metrics]} )"
