@@ -80,7 +80,7 @@ class ExtendedEncoder(nn.Module):
         base_out, *other = self.base_net(*x)
         base_out_flat = base_out.view(base_out.size(0), -1)
 
-        base_out_flat = F.relu(base_out_flat)
+        # base_out_flat = F.relu(base_out_flat)
 
         z_mu = self.mu(base_out_flat)
         z_var = self.var(base_out_flat)
@@ -325,7 +325,7 @@ class MultiTaskVAELoss(nn.Module):
         # kl divergence loss
         kl_loss = 0.5 * torch.sum(torch.exp(z_var) + z_mu ** 2 - 1.0 - z_var)
 
-        final_loss = torch.mean(b_loss) + kl_loss.mean() * self.lw[0]() / len(self.cat_loss)
+        final_loss = torch.mean(b_loss) + 0.1 * kl_loss.mean() * self.lw[0]() / len(self.cat_loss)
         return final_loss
 
     def __repr__(self):
