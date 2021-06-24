@@ -593,7 +593,7 @@ def load_json_conf(ctx, json_conf, max_conf_file=20, **kwargs):
     # all other configure json_conf2, ... will be in config too
     for idx in range(max_conf_file):
         additional_conf = 'json_conf{}'.format(idx)
-        if config.get(additional_conf, None) is not None:
+        if config.get(additional_conf, None) is not None and Path(config[additional_conf]).is_file():
             with open(config[additional_conf]) as fp:
                 config2 = json.load(fp=fp)
                 config2 = load_depend_conf(**config2)
