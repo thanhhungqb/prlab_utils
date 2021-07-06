@@ -17,7 +17,7 @@ matplotlib
 
 fastai>=2.0.0
 
-git+https://github.com/thanhhungqb/outside_collection.git
+git+https://github.com/thanhhungqb/outside_collection.git@v1.0.0
 
 wandb
 tabulate
