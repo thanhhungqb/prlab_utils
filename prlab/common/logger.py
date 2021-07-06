@@ -1,5 +1,6 @@
 import json
 from logging import Handler, LogRecord, getLogger, StreamHandler, makeLogRecord
+from pathlib import Path
 
 logger = getLogger(__name__)
 
@@ -23,8 +24,16 @@ class WandbHandler(Handler):
         self.lock = None
 
         name = config.get('proj_name', 'default')
-        wandb.init(name=config.get('run'), project=name,
-                   dir=config.get('cp', './wandb'))
+        cp = config.get('cp', './wandb')
+        run_name = "{}{}".format(config.get('run', 'run'), config.get('test_fold', config.get('fold', '')))
+        if wandb.run is not None:
+            try:
+                wandb.run.finish()
+            except:
+                print('could close running wandb run')
+
+        wandb.init(name=run_name, project=name, dir=cp, reinit=True)
+        wandb.save(str((Path(cp) / 'configure.json').absolute())) if (Path(cp) / 'configure.json').is_file() else None
 
     def set_model(self, model):
         self.wandb.watch(model)
